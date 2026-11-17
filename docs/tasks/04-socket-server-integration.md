@@ -112,6 +112,7 @@ Doesn't exist. The pure session core (task 03) decides outcomes but nothing is l
 - A connection without an `Origin` header is refused. Browsers always send it; non-browser clients must set it.
 - `ALLOWED_ORIGINS` (comma-separated, each a bare `http`/`https` origin) sets the allow-list; an invalid entry stops the server with `server_start_failed invalid_origins`. Without it, `NODE_ENV=production` means same-origin (the Origin's host equals the request's `Host`), and anything else allows `http://localhost:4200` and `http://127.0.0.1:4200`.
 - Log format: one line per event, `event=<name> outcome=<code>`; connects and disconnects log the connected socket count, and the sweep logs the number of expired sessions.
+- `compose.yaml` sets `ALLOWED_ORIGINS` from `CLIENT_PORT` for both services, so a stack published on another host port is not refused by the development allow-list.
 - Default sweep interval 60 s; TTL, session cap and rate limits use the task 03 defaults.
 
 **Verified or corrected:**

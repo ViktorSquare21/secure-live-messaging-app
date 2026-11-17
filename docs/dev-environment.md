@@ -16,7 +16,7 @@ The repo pins Node 24 LTS (`.nvmrc`, `engines`, the Docker base image) with `eng
 | 4200 | Angular dev server, serves the app and proxies `/socket.io` | The browser, at `http://localhost:4200` |
 | 3000 | Socket.IO server, WebSocket only | Only `127.0.0.1` inside the same machine or container, through the dev proxy |
 
-- `CLIENT_PORT` changes the host port Docker publishes for 4200 (for example `CLIENT_PORT=4310`).
+- `CLIENT_PORT` changes the host port Docker publishes for 4200 (for example `CLIENT_PORT=4310`). Compose sets the server's `ALLOWED_ORIGINS` to the same port, so Socket.IO accepts the page on it.
 - `PORT` changes the server port; the dev proxy reads the same variable, so both stay in step.
 
 Open the app at `http://localhost:...`, never a LAN IP: WebCrypto works only on `https` or `localhost`.
