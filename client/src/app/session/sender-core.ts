@@ -1,4 +1,5 @@
 import { isPositiveSafeSeq, isToken, MAX_CIPHERTEXT_CHARS, TAG_BYTES, type AckErrorCode } from '@slm/shared';
+import type { ConnectionState } from './session-socket';
 
 export interface SenderRecord {
   readonly senderToken: string;
@@ -54,3 +55,10 @@ export function withLastSeq(record: SenderRecord, lastSeq: number): SenderRecord
 }
 
 export type SenderError = AckErrorCode | 'protocol_error' | 'unreachable';
+
+export type SenderConnection = ConnectionState | 'connecting';
+
+// The socket reports "disconnected" before its first connect, which is not a drop worth announcing.
+export function nextSenderConnection(previous: SenderConnection, state: ConnectionState): SenderConnection {
+  return previous === 'connecting' && state === 'disconnected' ? 'connecting' : state;
+}

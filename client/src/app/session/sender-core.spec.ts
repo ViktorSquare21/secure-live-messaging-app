@@ -3,6 +3,7 @@ import {
   base64UrlLength,
   buildReceiverLink,
   envelopeFits,
+  nextSenderConnection,
   parseSenderRecord,
   receiverTokenKey,
   senderRecordKey,
@@ -59,5 +60,12 @@ describe('sender core', () => {
     expect(parseSenderRecord(JSON.stringify({ senderToken, keyFragment: 'short', lastSeq: 0 }))).toBeNull();
     expect(parseSenderRecord(JSON.stringify({ senderToken, keyFragment: fragment, lastSeq: -1 }))).toBeNull();
     expect(parseSenderRecord(JSON.stringify({ senderToken, keyFragment: fragment, lastSeq: 1.5 }))).toBeNull();
+  });
+
+  it('stays connecting until the first connect, then follows every state including a drop', () => {
+    expect(nextSenderConnection('connecting', 'disconnected')).toBe('connecting');
+    expect(nextSenderConnection('connecting', 'connected')).toBe('connected');
+    expect(nextSenderConnection('connected', 'disconnected')).toBe('disconnected');
+    expect(nextSenderConnection('disconnected', 'reconnected')).toBe('reconnected');
   });
 });

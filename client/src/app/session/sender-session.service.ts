@@ -26,15 +26,17 @@ import { parsePublishAck, parseSenderJoinAck, parseSessionCreateAck } from './ac
 import {
   buildReceiverLink,
   envelopeFits,
+  nextSenderConnection,
   parseSenderRecord,
   senderRecordKey,
   serializeSenderRecord,
   withLastSeq,
+  type SenderConnection,
   type SenderError,
   type SenderRecord,
 } from './sender-core';
 import { APP_ORIGIN, CLOCK, SESSION_CRYPTO, SESSION_STORAGE } from './session-env';
-import { SessionSocket, type ConnectionState } from './session-socket';
+import { SessionSocket } from './session-socket';
 
 export const PUBLISH_DEBOUNCE_MS = 300;
 export const CONNECT_TIMEOUT_MS = 5_000;
@@ -63,7 +65,7 @@ export class SenderSessionService {
   private readonly tooLongSignal = signal(false);
   private readonly notResumableSignal = signal(false);
   private readonly sendingSignal = signal(false);
-  private readonly connectionSignal = signal<ConnectionState>('disconnected');
+  private readonly connectionSignal = signal<SenderConnection>('connecting');
 
   readonly receiverLink = this.receiverLinkSignal.asReadonly();
   readonly lastSentAt = this.lastSentAtSignal.asReadonly();
@@ -131,7 +133,7 @@ export class SenderSessionService {
     this.socket.connection$
       .pipe(
         tap((state) => {
-          this.connectionSignal.set(state);
+          this.connectionSignal.update((previous) => nextSenderConnection(previous, state));
           if (state !== 'disconnected') return;
           this.joined = false;
           this.peerSignal.set(null);

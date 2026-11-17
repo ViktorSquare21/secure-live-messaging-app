@@ -378,7 +378,8 @@ describe('SenderSessionService', () => {
     expect(service.connection()).toBe('disconnected');
   });
 
-  it('exposes its own connection state', async () => {
+  it('exposes its own connection state, starting as connecting', async () => {
+    expect(setup(new FakeSessionSocket(), new MemoryStorage()).connection()).toBe('connecting');
     const { service, socket } = await startedSession();
     expect(service.connection()).toBe('connected');
     socket.drop();

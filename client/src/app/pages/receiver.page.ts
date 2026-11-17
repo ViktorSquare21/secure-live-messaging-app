@@ -16,10 +16,10 @@ import { receiverErrorMessage, receiverStatusLabel } from './page-view';
     } @else {
       <div role="status" aria-label="Session status">
         <mat-chip-set>
-          <mat-chip [class.rejected]="rejected()">{{ statusLabel() }}</mat-chip>
+          <mat-chip [class.rejected]="rejectedStatus()">{{ statusLabel() }}</mat-chip>
         </mat-chip-set>
       </div>
-      @if (rejected()) {
+      @if (integrityWarning()) {
         <p class="banner" role="alert" aria-label="Integrity warning">
           An update could not be verified and was ignored. Showing the last verified text.
         </p>
@@ -57,7 +57,8 @@ export class ReceiverPage {
   private readonly session = inject(ReceiverSessionService);
 
   protected readonly text = computed(() => this.session.state().text);
-  protected readonly rejected = computed(() => this.session.state().status === 'integrity_error');
+  protected readonly rejectedStatus = computed(() => this.session.state().status === 'integrity_error');
+  protected readonly integrityWarning = computed(() => this.session.state().integrityWarning);
   protected readonly statusLabel = computed(() => receiverStatusLabel(this.session.state().status));
   protected readonly errorMessage = computed(() => receiverErrorMessage(this.session.error()));
 

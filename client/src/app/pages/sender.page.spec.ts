@@ -148,6 +148,16 @@ describe('SenderPage', () => {
     await settle(r, () => expect(chip()).toBe('Reconnecting…'));
   });
 
+  it('says waiting for receiver, not reconnecting, before its first connection', async () => {
+    const socket = new FakeSessionSocket();
+    socket.connect = () => undefined;
+    const r = await render({ socket });
+    const chip = (): string => byLabel(r.element, 'status', 'Receiver status')?.textContent?.trim() ?? '';
+
+    await settle(r, () => expect(chip()).toBe('Waiting for receiver'));
+    expect(r.socket.emitsOf(EVENTS.senderJoin)).toHaveLength(0);
+  });
+
   it('shows not sent yet, then sending while the ack is held, then the local time of the ack', async () => {
     const socket = new FakeSessionSocket();
     const r = await render({ socket });

@@ -74,7 +74,7 @@ describe('ReceiverSessionService', () => {
     await f.service.open(f.sessionId, f.fragment);
 
     expect(f.socket.emitsOf(EVENTS.receiverJoin)[0]?.args[0]).toEqual({ sessionId: f.sessionId });
-    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'latest text', lastSeq: 4, status: 'live' }));
+    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'latest text', lastSeq: 4, status: 'live', integrityWarning: false }));
     expect(f.service.error()).toBeNull();
   });
 
@@ -84,7 +84,7 @@ describe('ReceiverSessionService', () => {
     expect(f.service.state().status).toBe('waiting');
 
     f.socket.serverEmit(EVENTS.messageUpdate, await encrypt(f.key, f.sessionId, 1, 'hi'));
-    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'hi', lastSeq: 1, status: 'live' }));
+    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'hi', lastSeq: 1, status: 'live', integrityWarning: false }));
   });
 
   it('keeps the text and shows integrity error for a tampered update, then recovers on a valid newer one', async () => {
@@ -92,11 +92,11 @@ describe('ReceiverSessionService', () => {
     await f.service.open(f.sessionId, f.fragment);
     f.socket.serverEmit(EVENTS.messageUpdate, await encrypt(f.key, f.sessionId, 1, 'good'));
     f.socket.serverEmit(EVENTS.messageUpdate, tamper(await encrypt(f.key, f.sessionId, 2, 'evil')));
-    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'good', lastSeq: 1, status: 'integrity_error' }));
+    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'good', lastSeq: 1, status: 'integrity_error', integrityWarning: true }));
     expect(JSON.stringify(f.service.state())).not.toContain('evil');
 
     f.socket.serverEmit(EVENTS.messageUpdate, await encrypt(f.key, f.sessionId, 3, 'fixed'));
-    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'fixed', lastSeq: 3, status: 'live' }));
+    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'fixed', lastSeq: 3, status: 'live', integrityWarning: false }));
   });
 
   it('rejects a replayed update and one that fails the validator without throwing', async () => {
@@ -107,7 +107,7 @@ describe('ReceiverSessionService', () => {
     await vi.waitFor(() => expect(f.service.state().status).toBe('live'));
 
     f.socket.serverEmit(EVENTS.messageUpdate, first);
-    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'one', lastSeq: 1, status: 'integrity_error' }));
+    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'one', lastSeq: 1, status: 'integrity_error', integrityWarning: true }));
 
     f.socket.serverEmit(EVENTS.messageUpdate, { ...(await encrypt(f.key, f.sessionId, 2, 'two')), extra: true });
     f.socket.serverEmit(EVENTS.messageUpdate, 'not an envelope');
@@ -135,7 +135,7 @@ describe('ReceiverSessionService', () => {
     f.socket.serverEmit(EVENTS.messageUpdate, await encrypt(f.key, f.sessionId, 2, 'newer'));
     slow.resolve();
 
-    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'newer', lastSeq: 2, status: 'live' }));
+    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'newer', lastSeq: 2, status: 'live', integrityWarning: false }));
     expect(order).toEqual([1, 2]);
   });
 
@@ -148,14 +148,14 @@ describe('ReceiverSessionService', () => {
     await vi.waitFor(() => expect(f.service.state().status).toBe('live'));
 
     f.socket.drop();
-    expect(f.service.state()).toEqual({ text: 'same text', lastSeq: 5, status: 'disconnected' });
+    expect(f.service.state()).toEqual({ text: 'same text', lastSeq: 5, status: 'disconnected', integrityWarning: false });
 
     f.socket.responder = () => joinAck(latest);
     f.socket.reconnect();
     await vi.waitFor(() => expect(f.socket.emitsOf(EVENTS.receiverJoin)).toHaveLength(2));
 
     expect(f.socket.emitsOf(EVENTS.receiverJoin)[1]?.args[0]).toEqual({ sessionId: f.sessionId, rejoinToken: firstToken });
-    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'same text', lastSeq: 5, status: 'live' }));
+    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'same text', lastSeq: 5, status: 'live', integrityWarning: false }));
   });
 
   it('applies a newer latest on rejoin and flags an older one', async () => {
@@ -169,13 +169,13 @@ describe('ReceiverSessionService', () => {
     f.socket.drop();
     f.socket.responder = () => joinAck(missed);
     f.socket.reconnect();
-    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'four', lastSeq: 4, status: 'live' }));
+    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'four', lastSeq: 4, status: 'live', integrityWarning: false }));
 
     const older = await encrypt(f.key, f.sessionId, 2, 'two');
     f.socket.drop();
     f.socket.responder = () => joinAck(older);
     f.socket.reconnect();
-    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'four', lastSeq: 4, status: 'integrity_error' }));
+    await vi.waitFor(() => expect(f.service.state()).toEqual({ text: 'four', lastSeq: 4, status: 'integrity_error', integrityWarning: true }));
   });
 
   it('keeps the rejoin token in sessionStorage so a reload rejoins with it', async () => {

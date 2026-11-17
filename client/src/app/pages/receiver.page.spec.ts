@@ -109,6 +109,24 @@ describe('ReceiverPage', () => {
     expect(byLabel(r.element, 'alert', 'Integrity warning')).toBeNull();
   });
 
+  it('keeps the integrity banner through a disconnect and rejoin until the next valid update', async () => {
+    const r = await render();
+    const first = await encrypt(r.key, r.sessionId, 1, 'one');
+    r.socket.serverEmit(EVENTS.messageUpdate, first);
+    await settle(r, () => expect(textOf(r.element)).toBe('one'));
+    r.socket.serverEmit(EVENTS.messageUpdate, first);
+    await settle(r, () => expect(byLabel(r.element, 'alert', 'Integrity warning')).not.toBeNull());
+
+    r.socket.drop();
+    r.socket.reconnect();
+    await settle(r, () => expect(byLabel(r.element, 'status', 'Session status')?.textContent).toContain('Live'));
+    expect(byLabel(r.element, 'alert', 'Integrity warning')).not.toBeNull();
+
+    r.socket.serverEmit(EVENTS.messageUpdate, await encrypt(r.key, r.sessionId, 2, 'two'));
+    await settle(r, () => expect(textOf(r.element)).toBe('two'));
+    expect(byLabel(r.element, 'alert', 'Integrity warning')).toBeNull();
+  });
+
   it('shows markup in the received text literally and creates no elements from it', async () => {
     const r = await render();
     const hostile = '<script>window.slmHacked = 1</script><img src="x" onerror="window.slmHacked = 1">';

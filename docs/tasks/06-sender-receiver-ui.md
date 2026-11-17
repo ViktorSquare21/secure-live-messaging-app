@@ -120,8 +120,9 @@ Doesn't exist. Task 05 provides the socket service, the sender publish pipeline 
 **Deviations**
 - The task 05 sender service gained:
   - a `sending` signal, needed for "Sending…";
-  - a `connection` signal, needed for "Reconnecting…";
+  - a `connection` signal, needed for "Reconnecting…". It starts as `connecting` and stays there until the first connect (pure `nextSenderConnection`), so a new sender page reads "Waiting for receiver", not "Reconnecting…";
   - a 5 s connect timeout on `createSession` that fails with a new `unreachable` error. Without it, home would wait forever when the server is down.
+- The task 05 receiver reducer gained an `integrityWarning` flag. A rejected update sets it, and only an accepted update clears it. The banner follows this flag rather than the status, so it stays through a disconnect and rejoin.
 - `@angular/router` 21.2.26 added; routes are impossible without it.
 - `client/angular.json`: `prebundle.exclude: ["@slm/shared"]` for `ng serve`. Vite prebundling can't resolve the TypeScript-source workspace package. The dev server failed with `Could not resolve "./base64url"` as soon as a served page imported `@slm/shared`. The production build was not affected.
 - The criterion "a missing or altered key shows the key error" is only partly met, so it stays unticked:
@@ -147,12 +148,15 @@ Doesn't exist. Task 05 provides the socket service, the sender publish pipeline 
 - The browser run found the dev-server prebundle failure described under Deviations. Unit tests and the production build had both passed.
 - The browser run also found that the "Last sent" text carried surrounding whitespace from the `@switch` block. The template was compacted.
 - Checked in the browser: with one character of the key fragment changed, the receiver joined, the sender showed "Receiver connected", no key error appeared, and the first update showed the integrity warning with no text (see Deviations).
+- An acceptance-criteria review of the PR found two gaps, both fixed with tests:
+  - The integrity banner disappeared on a disconnect and rejoin, because it was bound to the status, which the rejoin sets back to live. The criterion asks for it to stay until the next accepted update.
+  - On first load, the sender chip read "Reconnecting…" until the socket connected, because the connection signal started as `disconnected`.
 - Planted faults, each reverted afterwards:
   - `[innerHTML]` on the receiver text: the sink scan and the literal-markup spec both failed.
   - The copy fallback `select()` removed: both fallback specs failed.
 
 **Test results**
-- `npm test`: shared 262, server 113 and client 127, all passing. This includes 37 tests in `pages/` and 4 new sender service tests.
+- `npm test`: shared 262, server 113 and client 131, all passing. This includes 39 tests in `pages/` and 4 new sender service tests.
 - `npm run typecheck`: passes in all workspaces.
 - `npm run build -w @slm/client`: no budget warnings. The initial bundle is 272.47 kB raw, 74.80 kB transferred.
 - `npm audit --omit=dev`: 0 vulnerabilities.
