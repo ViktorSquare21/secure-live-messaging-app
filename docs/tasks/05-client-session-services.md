@@ -66,32 +66,32 @@ Doesn't exist.
 - Invariant 7: decryption failures become a state, never an exception reaching the UI, and the rejected message's partial or full plaintext is never put into the state.
 
 ## Tests
-- [ ] Unit (pure): a valid first envelope moves waiting to live with its text and seq.
-- [ ] Unit (pure): a tampered envelope (integrity error result) keeps the previous text and seq and sets integrity error.
-- [ ] Unit (pure): a malformed result and an envelope failing the validator both keep the previous text and set integrity error.
-- [ ] Unit (pure): a replayed envelope with the same seq as the last accepted one is rejected with integrity error.
-- [ ] Unit (pure): an out-of-order envelope with a lower seq is rejected after a higher one was accepted.
-- [ ] Unit (pure): a valid newer update after an integrity error returns to live with the new text.
-- [ ] Unit (pure): a resync latest with the same seq keeps the state without a warning; a resync with a lower seq sets integrity error.
-- [ ] Unit (pure): disconnect keeps the text and sets disconnected; the transition never mutates the state it is given.
-- [ ] Unit (fake timers, fake socket): typing several values within 300 ms publishes once, with only the latest text.
-- [ ] Unit (fake timers, fake socket): two debounced changes publish seq n and n+1; the same text typed again is not republished.
-- [ ] Unit (fake timers, fake socket): with the first ack held back and then released, three texts typed with pauses longer than the debounce are published in order, one at a time. The middle text is skipped because it is stale by the time its turn comes. Exactly two envelopes go out, with consecutive seqs, ending on the latest text, and both acks are handled.
-- [ ] Unit (fake timers, fake socket): a rejected ack (stale seq) for a publish that a newer text followed still surfaces as an error state; it is never silently dropped.
-- [ ] Unit (fake timers, fake socket): after a simulated disconnect and reconnect the sender rejoins with its token and republishes the unacknowledged text with a higher seq.
-- [ ] Unit (fake socket): after a simulated reconnect the receiver rejoins with the rejoin token from its first join ack and applies the latest envelope; text is unchanged and no warning shows when the seq is the same.
-- [ ] Unit (fake socket): two updates whose decrypts finish in reverse order are still applied in arrival order, ending on the newer text.
-- [ ] Unit (fake socket): no emitted payload contains the plaintext or the key fragment.
-- [ ] Unit: a reloaded sender service restores session id, token, key and seq from sessionStorage and publishes its next update with a higher seq than before the reload.
+- [x] Unit (pure): a valid first envelope moves waiting to live with its text and seq.
+- [x] Unit (pure): a tampered envelope (integrity error result) keeps the previous text and seq and sets integrity error.
+- [x] Unit (pure): a malformed result and an envelope failing the validator both keep the previous text and set integrity error.
+- [x] Unit (pure): a replayed envelope with the same seq as the last accepted one is rejected with integrity error.
+- [x] Unit (pure): an out-of-order envelope with a lower seq is rejected after a higher one was accepted.
+- [x] Unit (pure): a valid newer update after an integrity error returns to live with the new text.
+- [x] Unit (pure): a resync latest with the same seq keeps the state without a warning; a resync with a lower seq sets integrity error.
+- [x] Unit (pure): disconnect keeps the text and sets disconnected; the transition never mutates the state it is given.
+- [x] Unit (fake timers, fake socket): typing several values within 300 ms publishes once, with only the latest text.
+- [x] Unit (fake timers, fake socket): two debounced changes publish seq n and n+1; the same text typed again is not republished.
+- [x] Unit (fake timers, fake socket): with the first ack held back and then released, three texts typed with pauses longer than the debounce are published in order, one at a time. The middle text is skipped because it is stale by the time its turn comes. Exactly two envelopes go out, with consecutive seqs, ending on the latest text, and both acks are handled.
+- [x] Unit (fake timers, fake socket): a rejected ack (stale seq) for a publish that a newer text followed still surfaces as an error state; it is never silently dropped.
+- [x] Unit (fake timers, fake socket): after a simulated disconnect and reconnect the sender rejoins with its token and republishes the unacknowledged text with a higher seq.
+- [x] Unit (fake socket): after a simulated reconnect the receiver rejoins with the rejoin token from its first join ack and applies the latest envelope; text is unchanged and no warning shows when the seq is the same.
+- [x] Unit (fake socket): two updates whose decrypts finish in reverse order are still applied in arrival order, ending on the newer text.
+- [x] Unit (fake socket): no emitted payload contains the plaintext or the key fragment.
+- [x] Unit: a reloaded sender service restores session id, token, key and seq from sessionStorage and publishes its next update with a higher seq than before the reload.
 
 ## Acceptance criteria
-- [ ] The receiver state transition is a pure function, and every case in the tests above passes without a socket or a browser.
-- [ ] Publishes are serialised: every envelope sent gets its ack handled, a superseded queued text is never sent, and no envelope is ever sent with a lower seq than one before it.
-- [ ] Typing quickly sends one encrypted publish per 300 ms pause, with the latest text and a seq one higher than the previous publish.
-- [ ] A tampered, malformed, replayed or older envelope leaves the receiver text unchanged and sets the integrity error status.
-- [ ] After a dropped connection, both services rejoin automatically: the receiver ends on the latest text without a false warning, and the sender's unacknowledged text reaches the server.
-- [ ] A sender page reload resumes the same session and never reuses a seq.
-- [ ] Nothing emitted to the server contains the key or the plaintext.
+- [x] The receiver state transition is a pure function, and every case in the tests above passes without a socket or a browser.
+- [x] Publishes are serialised: every envelope sent gets its ack handled, a superseded queued text is never sent, and no envelope is ever sent with a lower seq than one before it.
+- [x] Typing quickly sends one encrypted publish per 300 ms pause, with the latest text and a seq one higher than the previous publish.
+- [x] A tampered, malformed, replayed or older envelope leaves the receiver text unchanged and sets the integrity error status.
+- [x] After a dropped connection, both services rejoin automatically: the receiver ends on the latest text without a false warning, and the sender's unacknowledged text reaches the server.
+- [x] A sender page reload resumes the same session and never reuses a seq.
+- [x] Nothing emitted to the server contains the key or the plaintext.
 
 ## Out of scope
 - Project scaffold, workspaces and the dev proxy (task 00).
@@ -116,3 +116,39 @@ Doesn't exist.
 - **Summary:** explain *why*, not just *what*.
 - **Changed files:** the key files touched, one line each on why.
 - **Test results:** `npm test` output, plus `npm run e2e` for client or flow changes.
+
+## Implementation notes
+
+**Built**
+- `client/src/app/session/receiver-state.ts`: the pure receiver transition. It accepts an envelope only when it passes the shared validator, decrypts ok and has a higher seq; a resync with the same seq is ignored without a warning.
+- `ack-parsers.ts` and `sender-core.ts`: pure parsing of every server ack, the receiver link, the size check, and the sender record kept in sessionStorage.
+- `session-socket.ts`: the `SessionSocket` port and its Socket.IO shell (WebSocket only, explicit connect, 5 s ack timeout, fail-fast while disconnected, `off` on teardown).
+- `receiver-session.service.ts`: key import, join and rejoin with the stored rejoin token, and one arrival-ordered `concatMap(decrypt)` inbox into the transition.
+- `sender-session.service.ts`: create, resume, `debounceTime(300)` → `distinctUntilChanged` → `concatMap` publishing with the seq reserved in storage before the emit, and a republish of unacknowledged text after a rejoin.
+- `session-env.ts` and `testing/fake-session-socket.ts`: DI tokens for crypto, storage, clock and origin, and the fake socket and in-memory storage the specs use.
+
+**Deviations**
+- `distinctUntilChanged` takes a comparator: a repeat is dropped only when that text was actually sent. With the plain operator, a text skipped as stale and then typed back would never reach the receiver.
+- Two error codes beyond the task's list: `protocol_error` (a malformed ack from the server) and `invalid_key` (the receiver's key error state).
+
+**Decisions**
+- Ack shapes are validated in the client by composing the shared primitive validators, because adding ack validators to `shared/` would leave this task's surface.
+- A receiver join ack keeps `latest` unvalidated, so a bad latest envelope becomes an integrity error through the transition rather than a join failure.
+- Transport failures (not connected, ack timeout of 5 s) are not shown as an ack error; the text stays unacknowledged and the rejoin republishes it.
+- The latest envelope on the first join is applied as a resync too; with no accepted seq, any valid seq is accepted.
+- Storage keys are `slm:sender:<sessionId>` and `slm:receiver:<sessionId>`.
+- The sender's error state is cleared on a successful (re)join, not on a publish success, so a rejection stays visible.
+- Both services are provided per page (`@Injectable()` without `providedIn`), so each page gets its own state and subscriptions end with it. The socket port is a root singleton.
+- Crypto, sessionStorage, the clock and the origin are injected through DI tokens, so the specs swap them in without mocking modules.
+
+**Verified or corrected**
+- socket.io-client buffers an emit made while disconnected and sends it after the reconnect, before the rejoin has run. This was checked in its source; the wrapper therefore fails such an emit at once, covered by a test.
+- The stale-retype loss described under Deviations was found while planning, before any code was written.
+- The receiver ack parser first rejected a join whose `latest` failed the validator; this was changed so the transition decides, as described under Decisions.
+- Planted faults, each reverted afterwards: removing the stale skip (1 test failed), using the plain `distinctUntilChanged` (1 failed), changing `<=` to `<` in the seq rule (2 failed), `mergeMap` instead of `concatMap` in the receiver (1 failed), dropping the validator check (1 failed).
+
+**Test results**
+- `npm test`: shared 262, server 113, client 85, all passing (81 of the client tests are the session specs).
+- `npm run typecheck`: passes in all workspaces.
+- `npm audit --omit=dev`: 0 vulnerabilities.
+- No browser check: this task adds nothing visible in a browser.
