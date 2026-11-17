@@ -11,7 +11,7 @@ Written by the `secure-live-messaging-task-intake` skill from `docs/implementati
 | [04](04-socket-server-integration.md) | Socket.IO relay server wires the session core to live sender and receiver sockets | Feature | Server, Tests | 45 min | 01, 03 | Done |
 | [05](05-client-session-services.md) | Client session services: debounced encrypted publishing and pure receiver state | Feature | Client, Tests | 30 min | 01, 02 | Done |
 | [06](06-sender-receiver-ui.md) | Home, sender and receiver pages with Material, plain-text rendering and clear error states | Feature | Client, Tests | 40 min | 05 | Done |
-| [07](07-end-to-end-tests.md) | Two-browser end-to-end tests for live updates and a corrupted key link | Feature | Tests | 20 min | 04, 06 | Todo |
+| [07](07-end-to-end-tests.md) | Two-browser end-to-end tests for live updates and a corrupted key link | Feature | Tests | 20 min | 04, 06 | Done |
 | [08](08-security-headers-readme.md) | Server sends strict security headers on the built app, and the README documents architecture, threat model and AI usage | Feature | Server, Client, Tests, Docs | 25 min | 04, 07 | Todo |
 
 **Total:** 275 min.
