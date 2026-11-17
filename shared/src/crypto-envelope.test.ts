@@ -195,6 +195,7 @@ describe('decrypt returns malformed without throwing', () => {
     ['an IV that is not base64url', () => ({ ...envelope, iv: `${envelope.iv.slice(1)}=` })],
     ['a ciphertext that is not base64url', () => ({ ...envelope, ct: `${envelope.ct}!` })],
     ['a ciphertext shorter than the tag', () => ({ ...envelope, ct: envelope.ct.slice(0, 20) })],
+    ['a ciphertext over the size cap', () => ({ ...envelope, ct: encodeBase64Url(new Uint8Array(49_153)) })],
     [
       'an object whose field access throws',
       () =>

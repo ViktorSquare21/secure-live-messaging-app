@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { encodeBase64Url } from './base64url';
-import { buildAad, isPositiveSafeSeq, parseEnvelope } from './envelope';
+import { buildAad, isPositiveSafeSeq, MAX_CIPHERTEXT_CHARS, parseEnvelope } from './envelope';
 
 const iv12 = encodeBase64Url(new Uint8Array(12));
 const ct16 = encodeBase64Url(new Uint8Array(16));
@@ -39,7 +39,26 @@ describe('parseEnvelope', () => {
     expect(parsed?.ct.length).toBe(16);
   });
 
+  test('accepts a ciphertext of exactly the size cap', () => {
+    const ct = encodeBase64Url(new Uint8Array(49_152));
+    expect(ct.length).toBe(MAX_CIPHERTEXT_CHARS);
+    expect(parseEnvelope({ ...valid, ct })?.ct.length).toBe(49_152);
+  });
+
+  test('rejects a well-formed ciphertext just over the size cap', () => {
+    const ct = encodeBase64Url(new Uint8Array(49_153));
+    expect(ct.length).toBe(MAX_CIPHERTEXT_CHARS + 2);
+    expect(parseEnvelope({ ...valid, ct })).toBeNull();
+  });
+
   const { ct: _ct, ...missingCt } = valid;
+
+  class EnvelopeLike {
+    v = 1;
+    seq = 5;
+    iv = iv12;
+    ct = ct16;
+  }
 
   test.each<[string, unknown]>([
     ['null', null],
@@ -63,6 +82,7 @@ describe('parseEnvelope', () => {
     ['iv not base64url', { ...valid, iv: `${iv12.slice(0, 15)}+` }],
     ['ct not base64url', { ...valid, ct: `${ct16}=` }],
     ['ct shorter than the tag', { ...valid, ct: encodeBase64Url(new Uint8Array(15)) }],
+    ['a class instance', new EnvelopeLike()],
   ])('rejects %s', (_, input) => {
     expect(parseEnvelope(input)).toBeNull();
   });

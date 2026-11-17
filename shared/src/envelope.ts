@@ -1,9 +1,11 @@
 import { decodeBase64Url } from './base64url';
+import { hasExactKeys } from './object-shape';
 
 export const ENVELOPE_VERSION = 1;
 export const KEY_BYTES = 32;
 export const IV_BYTES = 12;
 export const TAG_BYTES = 16;
+export const MAX_CIPHERTEXT_CHARS = 65_536;
 
 export interface Envelope {
   readonly v: typeof ENVELOPE_VERSION;
@@ -30,14 +32,11 @@ export function buildAad(sessionId: string, seq: number): Uint8Array<ArrayBuffer
 }
 
 export function parseEnvelope(input: unknown): ParsedEnvelope | null {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) return null;
-  const keys = Object.keys(input);
-  if (keys.length !== ENVELOPE_KEYS.length || !ENVELOPE_KEYS.every((key) => keys.includes(key))) {
-    return null;
-  }
-  const { v, seq, iv, ct } = input as Record<string, unknown>;
+  if (!hasExactKeys(input, ENVELOPE_KEYS)) return null;
+  const { v, seq, iv, ct } = input;
   if (v !== ENVELOPE_VERSION || !isPositiveSafeSeq(seq)) return null;
   if (typeof iv !== 'string' || typeof ct !== 'string') return null;
+  if (ct.length > MAX_CIPHERTEXT_CHARS) return null;
   const ivBytes = decodeBase64Url(iv);
   const ctBytes = decodeBase64Url(ct);
   if (ivBytes === null || ivBytes.length !== IV_BYTES) return null;
