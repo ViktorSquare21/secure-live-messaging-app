@@ -8,6 +8,8 @@ import { DEFAULT_RATE_LIMITS } from './rate-limiter';
 import { attachRelay } from './relay';
 import { DEFAULT_SESSION_CONFIG, type SessionConfig } from './session-core';
 import { socketServerOptions } from './socket-options';
+import { createStaticHandler } from './static-files';
+import type { StaticSite } from './static-site';
 
 export const DEFAULT_SWEEP_INTERVAL_MS = 60_000;
 
@@ -20,6 +22,7 @@ export interface StartServerOptions {
   readonly sweepIntervalMs?: number;
   readonly now?: () => number;
   readonly log?: Logger;
+  readonly staticSite?: StaticSite;
 }
 
 export type RunningServer = {
@@ -32,7 +35,8 @@ export type RunningServer = {
 const consoleLogger: Logger = (entry) => console.log(formatLogEntry(entry));
 
 export async function startServer(options: StartServerOptions): Promise<RunningServer> {
-  const http = createServer();
+  // Socket.IO wraps the request listeners already attached and claims its own path first, so the handler never sees /socket.io/.
+  const http = options.staticSite === undefined ? createServer() : createServer(createStaticHandler(options.staticSite));
   const io = new Server(http, socketServerOptions(options.originPolicy));
   const relay = attachRelay(io, {
     sessionConfig: options.sessionConfig ?? DEFAULT_SESSION_CONFIG,

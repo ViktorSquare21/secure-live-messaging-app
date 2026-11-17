@@ -3,25 +3,25 @@ import { corsOrigins, DEV_ORIGINS, isOriginAllowed, resolveOriginPolicy, type Or
 
 describe('resolveOriginPolicy', () => {
   test('defaults to the local Angular dev server origins outside production', () => {
-    expect(resolveOriginPolicy({})).toEqual({ ok: true, policy: { kind: 'list', origins: DEV_ORIGINS } });
+    expect(resolveOriginPolicy({}, false)).toEqual({ ok: true, policy: { kind: 'list', origins: DEV_ORIGINS } });
     expect(DEV_ORIGINS).toEqual(['http://localhost:4200', 'http://127.0.0.1:4200']);
   });
 
   test('defaults to same-origin in production', () => {
-    expect(resolveOriginPolicy({ NODE_ENV: 'production' })).toEqual({ ok: true, policy: { kind: 'same-origin' } });
+    expect(resolveOriginPolicy({}, true)).toEqual({ ok: true, policy: { kind: 'same-origin' } });
   });
 
   test('takes a comma-separated allow-list from ALLOWED_ORIGINS in any environment', () => {
     const expected = { ok: true, policy: { kind: 'list', origins: ['https://a.example', 'http://b.example:8080'] } };
-    expect(resolveOriginPolicy({ ALLOWED_ORIGINS: 'https://a.example, http://b.example:8080' })).toEqual(expected);
+    expect(resolveOriginPolicy({ ALLOWED_ORIGINS: 'https://a.example, http://b.example:8080' }, false)).toEqual(expected);
     expect(
-      resolveOriginPolicy({ NODE_ENV: 'production', ALLOWED_ORIGINS: 'https://a.example,http://b.example:8080' }),
+      resolveOriginPolicy({ ALLOWED_ORIGINS: 'https://a.example,http://b.example:8080' }, true),
     ).toEqual(expected);
   });
 
   test('rejects wildcards, paths, other schemes and anything that is not an exact origin', () => {
     for (const value of ['*', 'true', 'https://a.example/', 'https://a.example/path', 'ftp://a.example', 'a.example', 'https://A.example', 'https://a.example,']) {
-      expect(resolveOriginPolicy({ ALLOWED_ORIGINS: value })).toEqual({ ok: false, error: 'invalid_origins' });
+      expect(resolveOriginPolicy({ ALLOWED_ORIGINS: value }, true)).toEqual({ ok: false, error: 'invalid_origins' });
     }
   });
 });

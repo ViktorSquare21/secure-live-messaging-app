@@ -15,8 +15,9 @@ The repo pins Node 24 LTS (`.nvmrc`, `engines`, the Docker base image) with `eng
 |---|---|---|
 | 4200 | Angular dev server, serves the app and proxies `/socket.io` | The browser, at `http://localhost:4200` |
 | 3000 | Socket.IO server, WebSocket only | Only `127.0.0.1` inside the same machine or container, through the dev proxy |
+| 3000 (production) | The Node server serving the built app with the security headers, plus Socket.IO on the same origin | The browser, at `http://localhost:3000` after `npm start`; the `app` container publishes it on host port 4200 |
 
-- `CLIENT_PORT` changes the host port Docker publishes for 4200 (for example `CLIENT_PORT=4310`). Compose sets the server's `ALLOWED_ORIGINS` to the same port, so Socket.IO accepts the page on it.
+- `CLIENT_PORT` changes the host port Docker publishes for the app (for example `CLIENT_PORT=4310`). For `dev`, compose sets the server's `ALLOWED_ORIGINS` to the same port, so Socket.IO accepts the page on it. The `app` container serves page and socket from one origin and needs no allow-list.
 - `PORT` changes the server port; the dev proxy reads the same variable, so both stay in step.
 
 Open the app at `http://localhost:...`, never a LAN IP: WebCrypto works only on `https` or `localhost`.
@@ -28,7 +29,7 @@ Requires Docker with Compose v2. Run every command from the repo root.
 `compose.yaml` has two services:
 
 - `dev`: for development. Mounts the source for live reload, keeps `node_modules` in named volumes so host and container installs never mix, and includes Playwright Chromium. It sits in the `dev` profile, so a plain `docker compose up` doesn't start it.
-- `app`: runs the app from a copy of the source baked into the image. No live reload.
+- `app`: builds the client into the image and runs the server in production mode, which serves the built app with the security headers and the relay on one port. No live reload.
 
 ### First start
 
@@ -69,7 +70,7 @@ Any other command works the same way, for example `docker compose run --rm dev n
 docker compose up --build
 ```
 
-Starts only `app` at `http://localhost:4200`. Rebuild after a source change. Stop with `Ctrl+C` and `docker compose down`.
+Starts only `app` at `http://localhost:4200`, served by the Node server in production mode with the Content Security Policy and the other security headers. Rebuild after a source change. Stop with `Ctrl+C` and `docker compose down`.
 
 ## Host with Node 24
 
@@ -98,7 +99,8 @@ npm run e2e
 | `EACCES` errors on `node_modules` | The volumes were created before the image owned those folders. Reset them with `docker compose --profile dev down -v`, then the [first start](#first-start) again. |
 | Two checkouts of the repo share containers or volumes | Compose names projects after the folder. Give each checkout its own name: `COMPOSE_PROJECT_NAME=slm-<name> docker compose ...`. |
 | `server_start_failed invalid_port` | `PORT` isn't a number from 1 to 65535. Unset it or fix it. |
-| The browser can't connect to Socket.IO | Open the app on port 4200 (or your `CLIENT_PORT`), not 3000. The server accepts only WebSocket through the proxy; long-polling is refused by design. |
+| The browser can't connect to Socket.IO | In development, open the app on port 4200 (or your `CLIENT_PORT`), not 3000. The server accepts only WebSocket through the proxy; long-polling is refused by design. |
+| `server_start_failed missing_client_build` | Production mode found no client build. Use `npm start`, which builds first, or run `npm run build`. |
 
 ## Reset everything
 

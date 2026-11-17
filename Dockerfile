@@ -17,9 +17,10 @@ RUN mkdir -p node_modules shared/node_modules server/node_modules client/node_mo
 
 FROM deps AS app
 COPY --chown=node:node . .
-ENV CLIENT_HOST=0.0.0.0
-EXPOSE 4200
-CMD ["npm", "run", "dev"]
+RUN npm run build
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
+EXPOSE 3000
+CMD ["npm", "run", "start", "-w", "@slm/server"]
 
 FROM deps AS dev
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright

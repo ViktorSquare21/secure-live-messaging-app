@@ -56,9 +56,14 @@
                 },
                 "fonts": false
               },
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "deployUrl": "/"
             },
             "development": {
+              "index": {
+                "input": "src/index.dev.html",
+                "output": "index.html"
+              },
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
