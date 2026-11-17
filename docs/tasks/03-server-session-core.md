@@ -60,33 +60,33 @@ Doesn't exist.
 - The sender token is returned only in the create ack to the creating socket and never appears in any other effect.
 
 ## Tests
-- [ ] Unit: create, then sender joins, then receiver joins, then a publish produces an ok ack to the sender and a message update to the receiver carrying the identical envelope.
-- [ ] Unit: two consecutive publishes with seq 1 and 2 are both accepted and forwarded in order; the latest is the seq 2 envelope.
-- [ ] Unit: a receiver joining after a publish gets the latest envelope in its ack; a receiver joining before any publish gets an ok ack with no latest.
-- [ ] Unit: sender join with a wrong token gives `bad_token` and binds nothing; join with an unknown session id gives `unknown_session` for both roles.
-- [ ] Unit: a second receiver socket gets `slot_taken` while the first is bound, both without a rejoin token and with a wrong one.
-- [ ] Unit: a receiver socket presenting the current rejoin token takes over the bound slot: the old socket gets a disconnect effect and the new one gets the latest envelope.
-- [ ] Unit: the stored rejoin token is a hash; the plain token appears only in the join ack effect.
-- [ ] Unit: publish from the receiver socket, and from an unbound socket, gives `not_sender` and leaves the state unchanged.
-- [ ] Unit: publish with a duplicate seq and with a lower seq both give `stale_seq`; publish with an invalid envelope gives `invalid_payload`; neither changes the latest.
-- [ ] Unit: leave by the receiver frees the slot, tells the sender the peer disconnected, and a new receiver can then join and gets the latest.
-- [ ] Unit: leave by the sender, then a rejoin with the token restores publishing and the next seq must still be higher than the last accepted one.
-- [ ] Unit: sender takeover with the right token while the old sender socket is still bound gives a disconnect effect for the old socket, and publishing from the old socket afterwards gives `not_sender`.
-- [ ] Unit: peer status effects on joins tell each side whether the other is present.
-- [ ] Unit: expire removes a session with no bound slots that has been idle longer than the TTL, keeps one idle for less than the TTL, and keeps one older than the TTL that still has a bound socket.
-- [ ] Unit: create at the session cap gives `server_busy` and stores nothing; after expire removes a session, create succeeds again.
-- [ ] Unit: the rate limiter allows events up to the limit within a window, refuses the next one, and allows again once the window has passed; it never mutates the state it is given.
-- [ ] Unit: the core returns a new state and leaves the input state unchanged; calling it twice with the same inputs gives equal results.
-- [ ] Unit: the state stores a hash, not the raw sender token, and no effect other than the create ack contains the token.
+- [x] Unit: create, then sender joins, then receiver joins, then a publish produces an ok ack to the sender and a message update to the receiver carrying the identical envelope.
+- [x] Unit: two consecutive publishes with seq 1 and 2 are both accepted and forwarded in order; the latest is the seq 2 envelope.
+- [x] Unit: a receiver joining after a publish gets the latest envelope in its ack; a receiver joining before any publish gets an ok ack with no latest.
+- [x] Unit: sender join with a wrong token gives `bad_token` and binds nothing; join with an unknown session id gives `unknown_session` for both roles.
+- [x] Unit: a second receiver socket gets `slot_taken` while the first is bound, both without a rejoin token and with a wrong one.
+- [x] Unit: a receiver socket presenting the current rejoin token takes over the bound slot: the old socket gets a disconnect effect and the new one gets the latest envelope.
+- [x] Unit: the stored rejoin token is a hash; the plain token appears only in the join ack effect.
+- [x] Unit: publish from the receiver socket, and from an unbound socket, gives `not_sender` and leaves the state unchanged.
+- [x] Unit: publish with a duplicate seq and with a lower seq both give `stale_seq`; publish with an invalid envelope gives `invalid_payload`; neither changes the latest.
+- [x] Unit: leave by the receiver frees the slot, tells the sender the peer disconnected, and a new receiver can then join and gets the latest.
+- [x] Unit: leave by the sender, then a rejoin with the token restores publishing and the next seq must still be higher than the last accepted one.
+- [x] Unit: sender takeover with the right token while the old sender socket is still bound gives a disconnect effect for the old socket, and publishing from the old socket afterwards gives `not_sender`.
+- [x] Unit: peer status effects on joins tell each side whether the other is present.
+- [x] Unit: expire removes a session with no bound slots that has been idle longer than the TTL, keeps one idle for less than the TTL, and keeps one older than the TTL that still has a bound socket.
+- [x] Unit: create at the session cap gives `server_busy` and stores nothing; after expire removes a session, create succeeds again.
+- [x] Unit: the rate limiter allows events up to the limit within a window, refuses the next one, and allows again once the window has passed; it never mutates the state it is given.
+- [x] Unit: the core returns a new state and leaves the input state unchanged; calling it twice with the same inputs gives equal results.
+- [x] Unit: the state stores a hash, not the raw sender token, and no effect other than the create ack contains the token.
 
 ## Acceptance criteria
-- [ ] Every command (create, join as sender, join as receiver, publish, leave, expire) returns the new state and a list of effects, and the module contains no clock, randomness, logging or socket access.
-- [ ] A publish is accepted only from the socket bound to the sender slot, only with a valid envelope and only with a seq strictly higher than the last accepted one; every other publish gets the matching error code and changes nothing.
-- [ ] A receiver that joins late gets the latest envelope in its join ack, and a present receiver gets every accepted envelope byte-for-byte.
-- [ ] A second receiver is refused with `slot_taken`, and a sender rejoining with the right token takes over the slot and disconnects the old sender socket.
-- [ ] Create is refused with `server_busy` at the session cap, and the rate limiter is a pure function with the limits above.
-- [ ] Sessions with no bound sockets are removed by expire once idle longer than the configured TTL, and never before.
-- [ ] All the unit tests above pass under `npm test`.
+- [x] Every command (create, join as sender, join as receiver, publish, leave, expire) returns the new state and a list of effects, and the module contains no clock, randomness, logging or socket access.
+- [x] A publish is accepted only from the socket bound to the sender slot, only with a valid envelope and only with a seq strictly higher than the last accepted one; every other publish gets the matching error code and changes nothing.
+- [x] A receiver that joins late gets the latest envelope in its join ack, and a present receiver gets every accepted envelope byte-for-byte.
+- [x] A second receiver is refused with `slot_taken`, and a sender rejoining with the right token takes over the slot and disconnects the old sender socket.
+- [x] Create is refused with `server_busy` at the session cap, and the rate limiter is a pure function with the limits above.
+- [x] Sessions with no bound sockets are removed by expire once idle longer than the configured TTL, and never before.
+- [x] All the unit tests above pass under `npm test`.
 
 ## Out of scope
 - Workspace setup and test runner configuration (task 00).
@@ -114,3 +114,35 @@ Doesn't exist.
 - **Summary:** explain *why*, not just *what*.
 - **Changed files:** the key files touched, one line each on why.
 - **Test results:** `npm test` output, plus `npm run e2e` for client or flow changes.
+
+---
+## Implementation notes
+
+**Built:**
+- `server/src/session-core.ts`: `decide(state, command, now, config) → { changes, effects }`, `applyChanges(state, changes) → state`, and `runCommand`, which combines the two into the `{ state, effects }` form the task describes. Commands: `create`, `joinSender`, `joinReceiver`, `publish`, `leave`, `expire`. Defaults: 30 min TTL, 1,000 sessions.
+- The state is two maps: sessions by id, and bindings from socket id to `{ sessionId, role }`. The bindings map is the only source of a socket's role, gives an O(1) lookup from a socket to its session, and ensures one slot per socket.
+- `server/src/token-hash.ts`: SHA-256 of a token, and a constant-time `timingSafeEqual` comparison over equal-length digests. Both the sender token and the receiver rejoin token are stored only as hashes.
+- `server/src/rate-limiter.ts`: a pure fixed-window `checkRateLimit(state, now, limit)`. Defaults: create 5 per 60 s, publish 10 per 1 s.
+
+**Deviations:**
+- The task asks each command to return the new state. Doing that literally copies the session map on every publish, which is O(sessions) on the message path and conflicts with the CLAUDE.md performance rule. As decided during planning, `decide` returns a short change list instead, and `applyChanges` builds the new state from it. `runCommand` still returns `{ state, effects }` and is what every test drives. Task 04 can apply the same changes to its own maps in place, so a publish stays O(1).
+
+**Decisions:**
+- Creating under an id that already exists acks `server_busy` and changes nothing. That code already exists on the wire, and the shell can retry with a fresh id.
+- A successful sender join, including a takeover, always tells a present receiver `connected`; it never tells the receiver `disconnected`.
+- A receiver joining a free slot always gets a fresh rejoin token; a presented token is ignored then, as the task says.
+- Expiry removes a session only when `now - lastActivity > ttl`; exactly the TTL is kept.
+- The rate limiter leaves its state unchanged when it refuses an event, so refused events don't extend the window.
+- Hashes are plain `Uint8Array`, not `Buffer`, so a deep clone of the state compares equal in the purity tests.
+
+**Verified or corrected:**
+- The first test run failed 7 purity tests: `structuredClone` turns a Node `Buffer` into a plain `Uint8Array`, so the cloned input no longer equalled the original. Fixed by returning a plain `Uint8Array` from `hashToken`.
+- On review, the test guide's manual steps failed with `cannot open /app/.scenario.sh`: they asked for the script to be saved by hand before running it. They are now one paste-and-run block that pipes the script into the container, and that block, extracted from the guide, gives output identical to the guide's.
+- The acceptance-criteria review found that the test named "returns a new state" never checked for a new state, and for `expire` it couldn't: its fixture had no idle session to remove. The fixture now includes an idle, unbound session, and the test asserts that every command returns a different state. Making `expire` a no-op now fails that test.
+- Checked that the tests catch real faults by planting four of them one at a time: accepting an equal seq (2 tests failed), skipping the sender token check (1), skipping the rejoin token check (1), and letting any bound socket publish (2). The source was restored and compared byte for byte with a saved copy.
+
+**Test results:**
+- `docker compose run --rm dev npm test`: shared 262, server 63, client 4 tests, all passing.
+- `docker compose run --rm dev npm run typecheck`: passes in all three workspaces.
+- `docker compose run --rm dev npm audit --omit=dev`: 0 vulnerabilities.
+- No lint script in the repo. No browser check: this task touches only the server's pure core.
