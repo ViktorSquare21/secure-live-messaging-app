@@ -9,6 +9,7 @@ import {
   distinctUntilChanged,
   EMPTY,
   filter,
+  finalize,
   from,
   map,
   merge,
@@ -18,6 +19,8 @@ import {
   switchMap,
   take,
   tap,
+  throwError,
+  timeout,
 } from 'rxjs';
 import { parsePublishAck, parseSenderJoinAck, parseSessionCreateAck } from './ack-parsers';
 import {
@@ -31,9 +34,12 @@ import {
   type SenderRecord,
 } from './sender-core';
 import { APP_ORIGIN, CLOCK, SESSION_CRYPTO, SESSION_STORAGE } from './session-env';
-import { SessionSocket } from './session-socket';
+import { SessionSocket, type ConnectionState } from './session-socket';
 
 export const PUBLISH_DEBOUNCE_MS = 300;
+export const CONNECT_TIMEOUT_MS = 5_000;
+
+class UnreachableError extends Error {}
 
 interface ActiveSession {
   readonly sessionId: string;
@@ -56,6 +62,8 @@ export class SenderSessionService {
   private readonly errorSignal = signal<SenderError | null>(null);
   private readonly tooLongSignal = signal(false);
   private readonly notResumableSignal = signal(false);
+  private readonly sendingSignal = signal(false);
+  private readonly connectionSignal = signal<ConnectionState>('disconnected');
 
   readonly receiverLink = this.receiverLinkSignal.asReadonly();
   readonly lastSentAt = this.lastSentAtSignal.asReadonly();
@@ -63,6 +71,8 @@ export class SenderSessionService {
   readonly error = this.errorSignal.asReadonly();
   readonly tooLong = this.tooLongSignal.asReadonly();
   readonly notResumable = this.notResumableSignal.asReadonly();
+  readonly sending = this.sendingSignal.asReadonly();
+  readonly connection = this.connectionSignal.asReadonly();
 
   private readonly typed = new Subject<string>();
   private readonly republish = new Subject<string>();
@@ -90,11 +100,13 @@ export class SenderSessionService {
 
   createSession(): Observable<string | null> {
     return defer(() => {
+      this.errorSignal.set(null);
       this.socket.connect();
       return this.socket.connection$;
     }).pipe(
       filter((state) => state !== 'disconnected'),
       take(1),
+      timeout({ first: CONNECT_TIMEOUT_MS, with: () => throwError(() => new UnreachableError()) }),
       switchMap(() => this.socket.emitWithAck(EVENTS.sessionCreate)),
       map(parseSessionCreateAck),
       switchMap((ack) => {
@@ -102,7 +114,7 @@ export class SenderSessionService {
         if (!ack.ok) return this.fail(ack.error);
         return from(this.storeNewSession(ack.sessionId, ack.senderToken));
       }),
-      catchError(() => this.fail('protocol_error')),
+      catchError((error: unknown) => this.fail(error instanceof UnreachableError ? 'unreachable' : 'protocol_error')),
     );
   }
 
@@ -119,6 +131,7 @@ export class SenderSessionService {
     this.socket.connection$
       .pipe(
         tap((state) => {
+          this.connectionSignal.set(state);
           if (state !== 'disconnected') return;
           this.joined = false;
           this.peerSignal.set(null);
@@ -181,10 +194,12 @@ export class SenderSessionService {
       return from(this.crypto.encrypt(session.key, session.sessionId, seq, text)).pipe(
         concatMap((envelope) => {
           this.lastSentText = text;
+          this.sendingSignal.set(true);
           return this.socket.emitWithAck(EVENTS.messagePublish, envelope);
         }),
         map((raw) => this.handlePublishAck(parsePublishAck(raw), text)),
         catchError(() => EMPTY),
+        finalize(() => this.sendingSignal.set(false)),
       );
     });
   }

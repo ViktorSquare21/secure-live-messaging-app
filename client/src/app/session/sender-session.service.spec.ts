@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { decrypt, EVENTS, importKeyFromFragment, type Envelope } from '@slm/shared';
 import { firstValueFrom } from 'rxjs';
 import { parseSenderRecord, senderRecordKey } from './sender-core';
-import { PUBLISH_DEBOUNCE_MS, SenderSessionService } from './sender-session.service';
+import { CONNECT_TIMEOUT_MS, PUBLISH_DEBOUNCE_MS, SenderSessionService } from './sender-session.service';
 import { APP_ORIGIN, CLOCK, SESSION_STORAGE } from './session-env';
 import { SessionSocket } from './session-socket';
 import { FakeSessionSocket, HOLD, MemoryStorage } from './testing/fake-session-socket';
@@ -333,5 +333,57 @@ describe('SenderSessionService', () => {
     expect(wire).not.toContain(fragment);
     expect(wire).not.toContain('secret');
     for (const spy of consoleSpies) expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('reports unreachable when the server never connects, and clears it on the next attempt', async () => {
+    const socket = new FakeSessionSocket();
+    socket.connect = () => undefined;
+    const service = setup(socket, new MemoryStorage());
+
+    const result = firstValueFrom(service.createSession());
+    await vi.advanceTimersByTimeAsync(CONNECT_TIMEOUT_MS);
+
+    expect(await result).toBeNull();
+    expect(service.error()).toBe('unreachable');
+    service.createSession().subscribe();
+    expect(service.error()).toBeNull();
+  });
+
+  it('is sending only while a publish is unacknowledged', async () => {
+    const { service, socket } = await startedSession();
+    socket.responder = () => HOLD;
+    expect(service.sending()).toBe(false);
+
+    await type(service, 'hello');
+    const emit = await socket.waitForEmit(EVENTS.messagePublish, 1);
+    expect(service.sending()).toBe(true);
+    expect(service.lastSentAt()).toBeNull();
+
+    emit.respond({ ok: true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(service.sending()).toBe(false);
+    expect(service.lastSentAt()).toBe(1_700_000_000_000);
+  });
+
+  it('stops sending when the connection drops with an ack outstanding', async () => {
+    const { service, socket } = await startedSession();
+    socket.responder = () => HOLD;
+    await type(service, 'hello');
+    await socket.waitForEmit(EVENTS.messagePublish, 1);
+
+    socket.drop();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(service.sending()).toBe(false);
+    expect(service.connection()).toBe('disconnected');
+  });
+
+  it('exposes its own connection state', async () => {
+    const { service, socket } = await startedSession();
+    expect(service.connection()).toBe('connected');
+    socket.drop();
+    expect(service.connection()).toBe('disconnected');
+    socket.reconnect();
+    expect(service.connection()).toBe('reconnected');
   });
 });

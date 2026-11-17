@@ -54,24 +54,24 @@ Doesn't exist. Task 05 provides the socket service, the sender publish pipeline 
 - Importing the key before joining keeps a broken link from occupying the single receiver slot (invariant 4).
 
 ## Tests
-- [ ] Unit (component): the receiver page shows the integrity banner and keeps the previous text unchanged when the state moves from live with text to the integrity state.
-- [ ] Unit (component): a received text containing a script tag and an image tag with an error handler is shown literally as characters; no such elements exist in the rendered page.
-- [ ] Unit (component): a missing key and a malformed key both show the key error, show no text display, and the join is never called.
-- [ ] Unit (component): unknown session and slot taken each show their own message.
-- [ ] Unit (component): the receiver page contains no input, textarea or editable element, and its displayed text changes when the state's text changes, without a reload.
-- [ ] Unit (component): the sender page shows the receiver link with the key in the fragment, and the copy button writes exactly that link to the clipboard (clipboard stubbed).
-- [ ] Unit (component): the peer status chip and last-sent indicator follow the service state through waiting, connected, sending and sent.
+- [x] Unit (component): the receiver page shows the integrity banner and keeps the previous text unchanged when the state moves from live with text to the integrity state.
+- [x] Unit (component): a received text containing a script tag and an image tag with an error handler is shown literally as characters; no such elements exist in the rendered page.
+- [x] Unit (component): a missing key and a malformed key both show the key error, show no text display, and the join is never called.
+- [x] Unit (component): unknown session and slot taken each show their own message.
+- [x] Unit (component): the receiver page contains no input, textarea or editable element, and its displayed text changes when the state's text changes, without a reload.
+- [x] Unit (component): the sender page shows the receiver link with the key in the fragment, and the copy button writes exactly that link to the clipboard (clipboard stubbed).
+- [x] Unit (component): the peer status chip and last-sent indicator follow the service state through waiting, connected, sending and sent.
 - [ ] End-to-end: covered by task 07, which finds the elements by the roles and accessible names given here.
 
 ## Acceptance criteria
-- [ ] Clicking "New session" on home lands on the sender page with a receiver link that opens a working receiver page in another browser.
-- [ ] Text typed by the sender appears on the receiver page without a reload, with line breaks preserved.
-- [ ] The receiver page has no editable field; the sender page has exactly one, the text input.
-- [ ] Text like a script tag typed by the sender is shown literally on the receiver page and nothing executes.
-- [ ] When an update fails verification, the receiver shows the red integrity banner and the previous text stays on screen; the next valid update clears the banner.
+- [x] Clicking "New session" on home lands on the sender page with a receiver link that opens a working receiver page in another browser.
+- [x] Text typed by the sender appears on the receiver page without a reload, with line breaks preserved.
+- [x] The receiver page has no editable field; the sender page has exactly one, the text input.
+- [x] Text like a script tag typed by the sender is shown literally on the receiver page and nothing executes.
+- [x] When an update fails verification, the receiver shows the red integrity banner and the previous text stays on screen; the next valid update clears the banner.
 - [ ] Opening the receiver link with a missing or altered key shows the key error, no text, and the sender still sees "Waiting for receiver".
-- [ ] The sender sees the peer chip change to "Receiver connected" and back when the receiver tab closes, and the last-sent time updates after each acknowledged publish.
-- [ ] Every element the end-to-end task needs can be found by its role and accessible name.
+- [x] The sender sees the peer chip change to "Receiver connected" and back when the receiver tab closes, and the last-sent time updates after each acknowledged publish.
+- [x] Every element the end-to-end task needs can be found by its role and accessible name.
 
 ## Out of scope
 - Workspace, Angular and Material setup, dev proxy (task 00).
@@ -99,3 +99,62 @@ Doesn't exist. Task 05 provides the socket service, the sender publish pipeline 
 - **Summary:** explain *why*, not just *what*.
 - **Changed files:** the key files touched, one line each on why.
 - **Test results:** `npm test` output, plus `npm run e2e` for client or flow changes.
+
+## Implementation notes
+
+**Built**
+- Lazy routes in `app.routes.ts`: `''` home, `s/:sessionId` sender, `r/:sessionId` receiver, and `**` back to home. `app.ts` holds a Material toolbar and the router outlet.
+- `pages/home.page.ts`: the "New session" button. An `exhaustMap` over clicks creates one session at a time and opens its sender page. The button is disabled while busy, and errors appear in an alert.
+- `pages/sender.page.ts`:
+  - the read-only receiver link with "Copy link" (clipboard and a snackbar, or the field text selected when the clipboard is missing or refuses);
+  - the peer chip and the last-sent indicator;
+  - the one text input;
+  - errors for a session that can't be resumed and for a refused join.
+- `pages/receiver.page.ts`:
+  - the key is imported from the fragment before joining;
+  - the text is shown as plain text with `white-space: pre-wrap`;
+  - a status chip, the integrity banner, and one alert for key and join errors.
+- `pages/page-view.ts`: the pure peer phase, labels, last-sent view and error messages, tested directly.
+- `CLIPBOARD` token in `session-env.ts`, so the specs stub the clipboard.
+
+**Deviations**
+- The task 05 sender service gained:
+  - a `sending` signal, needed for "Sending…";
+  - a `connection` signal, needed for "Reconnecting…";
+  - a 5 s connect timeout on `createSession` that fails with a new `unreachable` error. Without it, home would wait forever when the server is down.
+- `@angular/router` 21.2.26 added; routes are impossible without it.
+- `client/angular.json`: `prebundle.exclude: ["@slm/shared"]` for `ng serve`. Vite prebundling can't resolve the TypeScript-source workspace package. The dev server failed with `Could not resolve "./base64url"` as soon as a served page imported `@slm/shared`. The production build was not affected.
+- The criterion "a missing or altered key shows the key error" is only partly met, so it stays unticked:
+  - A missing fragment, or one that doesn't decode to 32 bytes, gives the key error without joining. This was checked in the spec and in the browser.
+  - An AES-GCM key can't be checked without ciphertext. So a fragment that is altered but still decodes to a valid 32-byte key imports cleanly and joins, which takes the receiver slot. Every update then shows the integrity banner instead of the key error.
+  - Detecting that case before joining needs a key-check value in the protocol, which this task can't change.
+- The end-to-end test checkbox stays unticked. It belongs to task 07.
+- The receiver page does not show whether the sender is connected; the task doesn't ask for it.
+
+**Decisions**
+- Accessible names for task 07:
+  - Home: button "New session", alert "Session error".
+  - Sender: textbox "Your text", read-only textbox "Receiver link", button "Copy link", status "Receiver status", status "Last sent", alerts "Session error" and "Text too long".
+  - Receiver: region "Received text", status "Session status", alerts "Integrity warning" and "Session error" (key and join errors).
+- The server answers a sender join with `peer: 'disconnected'` when no receiver has joined yet. "Waiting for receiver" and "Receiver disconnected" are therefore told apart from the previous phase: a pure `nextPeerPhase` held in a `linkedSignal`.
+- Sender join errors `unknown_session`, `bad_token` and `slot_taken` are fatal: the input is disabled and a link leads home. Publish rejections such as `stale_seq` or `rate_limited` are shown but typing continues.
+- A receiver join refused with `invalid_payload` (a malformed id in the path) shows the "doesn't exist or has ended" message.
+- The connect timeout for creating a session is 5 s, the same as the ack timeout.
+- The altered-but-valid key case is accepted as a known limitation for the README. A key-check value in the protocol would close it. Until then that link joins, and every update shows the integrity banner.
+
+**Verified or corrected**
+- The first connect timeout returned an error value that flowed on into the ack parser, where it was overwritten by `protocol_error`. A spec caught this. The timeout now throws a dedicated error that `catchError` maps to `unreachable`.
+- The browser run found the dev-server prebundle failure described under Deviations. Unit tests and the production build had both passed.
+- The browser run also found that the "Last sent" text carried surrounding whitespace from the `@switch` block. The template was compacted.
+- Checked in the browser: with one character of the key fragment changed, the receiver joined, the sender showed "Receiver connected", no key error appeared, and the first update showed the integrity warning with no text (see Deviations).
+- Planted faults, each reverted afterwards:
+  - `[innerHTML]` on the receiver text: the sink scan and the literal-markup spec both failed.
+  - The copy fallback `select()` removed: both fallback specs failed.
+
+**Test results**
+- `npm test`: shared 262, server 113 and client 127, all passing. This includes 37 tests in `pages/` and 4 new sender service tests.
+- `npm run typecheck`: passes in all workspaces.
+- `npm run build -w @slm/client`: no budget warnings. The initial bundle is 272.47 kB raw, 74.80 kB transferred.
+- `npm audit --omit=dev`: 0 vulnerabilities.
+- `npm run e2e`: passes with no tests (task 07 adds them).
+- Headless Chromium walkthrough with two or more contexts: all 12 steps passed, 12 screenshots in `docs/guides/screenshots/06/`. See `docs/guides/06-test-guide.md`.

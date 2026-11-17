@@ -53,4 +53,4 @@ export function withLastSeq(record: SenderRecord, lastSeq: number): SenderRecord
   return { ...record, lastSeq };
 }
 
-export type SenderError = AckErrorCode | 'protocol_error';
+export type SenderError = AckErrorCode | 'protocol_error' | 'unreachable';

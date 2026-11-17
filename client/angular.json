@@ -69,7 +69,10 @@
         "serve": {
           "builder": "@angular/build:dev-server",
           "options": {
-            "proxyConfig": "proxy.conf.mjs"
+            "proxyConfig": "proxy.conf.mjs",
+            "prebundle": {
+              "exclude": ["@slm/shared"]
+            }
           },
           "configurations": {
             "production": {
