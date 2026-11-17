@@ -51,26 +51,26 @@ Doesn't exist. The repo holds only docs.
 - No logging of request URLs or bodies is added to the server shell. Later tasks must not have to remove something that could leak a key or plaintext (invariant 1).
 
 ## Tests
-- [ ] Unit: running the root test command from a clean install runs one smoke test in each of shared, server and client and exits successfully.
-- [ ] Unit: a deliberately failing test in any one workspace makes the root test command exit with a failure.
-- [ ] Unit: the client smoke test renders the placeholder root component under Vitest, proving the Angular test runner is wired.
-- [ ] End-to-end: running the root e2e command starts the stack and exits successfully with no tests present.
-- [ ] Manual: on a machine with Docker, the compose command builds the image and starts the app; the placeholder page loads at `http://localhost:4200`, the WebSocket upgrade on the Socket.IO path succeeds, and the server port is not reachable from the host.
-- [ ] Manual: `docker compose run --rm dev npm ci`, then `npm test`, `npm run typecheck` and `npm run e2e` in the `dev` service, all succeed with no Node on the host.
-- [ ] Manual: running the install with a Node major other than 24 fails with a message naming the required version.
-- [ ] Manual: with the dev command running, opening the app in a browser shows a WebSocket upgrade on the Socket.IO path to the app's own origin that succeeds, and no long-polling requests appear in the network panel.
+- [x] Unit: running the root test command from a clean install runs one smoke test in each of shared, server and client and exits successfully.
+- [x] Unit: a deliberately failing test in any one workspace makes the root test command exit with a failure.
+- [x] Unit: the client smoke test renders the placeholder root component under Vitest, proving the Angular test runner is wired.
+- [x] End-to-end: running the root e2e command starts the stack and exits successfully with no tests present.
+- [x] Manual: on a machine with Docker, the compose command builds the image and starts the app; the placeholder page loads at `http://localhost:4200`, the WebSocket upgrade on the Socket.IO path succeeds, and the server port is not reachable from the host.
+- [x] Manual: `docker compose run --rm dev npm ci`, then `npm test`, `npm run typecheck` and `npm run e2e` in the `dev` service, all succeed with no Node on the host.
+- [x] Manual: running the install with a Node major other than 24 fails with a message naming the required version.
+- [x] Manual: with the dev command running, opening the app in a browser shows a WebSocket upgrade on the Socket.IO path to the app's own origin that succeeds, and no long-polling requests appear in the network panel.
 
 ## Acceptance criteria
-- [ ] One install at the root sets up shared, server and client, and server and client resolve shared by its package name.
-- [ ] The root test command runs the Vitest suites of all three workspaces and exits successfully.
-- [ ] The root dev command serves the Angular placeholder page and the Socket.IO server together, and a browser on the Angular dev origin connects to Socket.IO through the proxy over WebSocket.
-- [ ] The server refuses long-polling connections; only WebSocket transport is accepted.
-- [ ] The root e2e command runs Playwright and passes with no tests yet.
-- [ ] The root typecheck command passes: all three workspaces compile under the shared strict TypeScript configuration with no errors.
-- [ ] The index page loads nothing from another host.
-- [ ] One Docker compose command builds and starts the app on Node 24 without Node on the host, and the placeholder page and its socket connection work at `http://localhost:4200`.
-- [ ] The `dev` compose service installs, runs the dev stack with live reload from the mounted source, and runs the test, typecheck and e2e commands.
-- [ ] The Node version file, the engines field and the Docker base image all name Node 24, and an install on another major fails.
+- [x] One install at the root sets up shared, server and client, and server and client resolve shared by its package name.
+- [x] The root test command runs the Vitest suites of all three workspaces and exits successfully.
+- [x] The root dev command serves the Angular placeholder page and the Socket.IO server together, and a browser on the Angular dev origin connects to Socket.IO through the proxy over WebSocket.
+- [x] The server refuses long-polling connections; only WebSocket transport is accepted.
+- [x] The root e2e command runs Playwright and passes with no tests yet.
+- [x] The root typecheck command passes: all three workspaces compile under the shared strict TypeScript configuration with no errors.
+- [x] The index page loads nothing from another host.
+- [x] One Docker compose command builds and starts the app on Node 24 without Node on the host, and the placeholder page and its socket connection work at `http://localhost:4200`.
+- [x] The `dev` compose service installs, runs the dev stack with live reload from the mounted source, and runs the test, typecheck and e2e commands.
+- [x] The Node version file, the engines field and the Docker base image all name Node 24, and an install on another major fails.
 
 ## Out of scope
 - Crypto envelope, key generation and fragment handling (01).
@@ -101,3 +101,41 @@ Doesn't exist. The repo holds only docs.
 - **Summary:** explain *why*, not just *what*.
 - **Changed files:** the key files touched, one line each on why.
 - **Test results:** `npm test` output, plus `npm run e2e` for client or flow changes.
+
+## Implementation notes
+
+**Built:**
+- Root npm workspace (`@slm/shared`, `@slm/server`, `@slm/client`) with `dev` (concurrently, `--kill-others`), `test`, `typecheck` and `e2e` scripts, one strict `tsconfig.base.json` (with `noUncheckedIndexedAccess`), Node 24 pinned in `.nvmrc`, `engines` and the Docker base image, and `engine-strict=true`.
+- `shared/` consumed as TypeScript source through its package `exports`; server (tsx) and client (Angular application builder) both resolve it by name without a path mapping.
+- `server/`: a bare Socket.IO server with WebSocket as the only transport, `serveClient: false`, `perMessageDeflate: false`, listening on `127.0.0.1` at `PORT` (default 3000). Pure `resolveServerPort` and `socketServerOptions`; thin `startServer` and `main` shells.
+- `client/`: Angular 21 placeholder (standalone, zoneless, OnPush), Material 21 with the azure-blue prebuilt theme and system fonts, `socket.io-client` installed but unused, Vitest through `@angular/build:unit-test`, `inlineCritical: false` in production, and a dev proxy that forwards only `/socket.io` with WebSocket forwarding.
+- Root Playwright config (Chromium only, starts `npm run dev`), empty `e2e/` folder.
+- `Dockerfile` (dependency layer from the lockfile, `app` and `dev` targets, non-root `node` user, Playwright Chromium in `dev`), `compose.yaml` (`app`; `dev` in the `dev` profile with the source mounted and `node_modules` in named volumes), `.dockerignore`.
+
+**Deviations:**
+- The published client port is `127.0.0.1:${CLIENT_PORT:-4200}` rather than a fixed `4200`, and only on the loopback interface. The default behaviour matches the task; the override lets checkouts run side by side, and loopback keeps the dev stack off other machines (WebCrypto needs `localhost` anyway).
+- The Socket.IO origin allow-list and `maxHttpBufferSize` are left to task 04, as the task's "Out of scope" says. `serveClient: false` and `perMessageDeflate: false` from `CLAUDE.md` are set already, because they cost nothing and nothing later has to undo them.
+
+**Decisions:**
+- Package names `@slm/shared`, `@slm/server`, `@slm/client`.
+- No router yet: the placeholder is the root component, and task 06 adds the routes.
+- The server reads `PORT`; the proxy config (`client/proxy.conf.mjs`) reads the same variable, so overriding it moves both ends together. An invalid `PORT` stops the server with `server_start_failed invalid_port`.
+- The server binds `127.0.0.1`, so the server port is unreachable from outside even inside Docker's network; the client dev server reaches it on the same machine.
+- `CLIENT_HOST` sets the `ng serve` host: `localhost` by default, `0.0.0.0` in both images.
+- `dev` sits in a compose profile, so `docker compose up --build` starts only `app`, while `docker compose run --rm dev …` and `docker compose up dev` still work.
+- A client unit test reads `src/index.html` and fails on any reference to another host or a hosted font/icon stylesheet, as the negative test for the no-third-party-origins rule.
+- Exact versions are pinned for every dependency, not only for `socket.io` and `socket.io-client`.
+
+**Verified or corrected:**
+- Stopping `npm run dev` in the container left the server and the Angular dev server running: `concurrently` kills child process trees through `tree-kill`, which calls `ps`, and `node:24-slim` ships without it. Found by sending `SIGINT` to `concurrently` during the browser check and listing `/proc`; fixed by installing `procps` in the base image. After the fix, both ports stop answering and the command exits with 0.
+- Checked that the Angular build accepts `shared/` TypeScript source from outside the client project (a temporary real export imported in `main.ts` built and type-checked), so the path-mapping fallback from the task notes was not needed.
+- Checked that `ngc --noEmit` does fail on a template type error, so the client typecheck isn't a silent no-op.
+- `npm audit` reports moderate advisories in dev-only tooling (`glob`, `minimatch` via the Angular CLI); `npm audit --omit=dev` is clean.
+
+**Test results:**
+- `docker compose run --rm dev npm test`: shared 1, server 14, client 4 tests, all passing.
+- `docker compose run --rm dev npm run typecheck`: passes.
+- `docker compose run --rm dev npm run e2e`: starts the dev stack, no tests, exit code 0.
+- `docker compose run --rm dev npm audit --omit=dev`: 0 vulnerabilities.
+- Manual Docker, proxy, long-polling, live reload, stop and Node 26 checks: see `docs/guides/00-test-guide.md`.
+- Test-gaps check over the working-tree diff: the two pure functions (`resolveServerPort`, `socketServerOptions`) already meet minimum coverage (branches, the 1/65535 and 0/65536 boundaries, the `invalid_port` failure, and the WebSocket-only negative test); the rest is shell code covered by the integration test. No tests added.
