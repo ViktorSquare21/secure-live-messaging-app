@@ -34,18 +34,18 @@ Doesn't exist. The root `e2e` script from task 00 has no tests behind it.
 - Invariant 6 (plain text only) is not separately tested here; the plaintext assertions use text content, so they hold whether or not markup is present.
 
 ## Tests
-- [ ] End-to-end: sender creates a session, receiver opens the link, and two consecutive updates appear on the receiver in order without a reload. The receiver page has no editable field.
-- [ ] End-to-end: no HTTP request URL or outgoing WebSocket frame from either browser contains the key or either plaintext during the live flow.
-- [ ] End-to-end: a truncated key in the link shows the invalid-key error and none of the sender's text.
-- [ ] End-to-end: a well-formed but wrong key shows the integrity warning and none of the sender's text.
+- [x] End-to-end: sender creates a session, receiver opens the link, and two consecutive updates appear on the receiver in order without a reload. The receiver page has no editable field.
+- [x] End-to-end: no HTTP request URL or outgoing WebSocket frame from either browser contains the key or either plaintext during the live flow.
+- [x] End-to-end: a truncated key in the link shows the invalid-key error and none of the sender's text.
+- [x] End-to-end: a well-formed but wrong key shows the integrity warning and none of the sender's text.
 
 ## Acceptance criteria
-- [ ] `npm run e2e` starts server and client on its own and passes from a clean checkout after `npm ci` and installing the Playwright Chromium browser.
-- [ ] The receiver shows the first text and then the second text typed by the sender, without a reload, and the second replaces the first.
-- [ ] Opening the receiver link with a truncated key shows the invalid-key error, and the sender's text is not present anywhere on the receiver page.
-- [ ] Opening the receiver link with a wrong but well-formed key shows the integrity warning, and the sender's text is not present anywhere on the receiver page.
-- [ ] Neither the key nor the plaintext appears in any request URL or outgoing WebSocket frame captured during the live flow.
-- [ ] The suite contains no fixed-duration waits and passes three runs in a row.
+- [x] `npm run e2e` starts server and client on its own and passes from a clean checkout after `npm ci` and installing the Playwright Chromium browser.
+- [x] The receiver shows the first text and then the second text typed by the sender, without a reload, and the second replaces the first.
+- [x] Opening the receiver link with a truncated key shows the invalid-key error, and the sender's text is not present anywhere on the receiver page.
+- [x] Opening the receiver link with a wrong but well-formed key shows the integrity warning, and the sender's text is not present anywhere on the receiver page.
+- [x] Neither the key nor the plaintext appears in any request URL or outgoing WebSocket frame captured during the live flow.
+- [x] The suite contains no fixed-duration waits and passes three runs in a row.
 
 ## Out of scope
 - Workspace scaffold, root `e2e` script and dev proxy (task 00).
@@ -73,3 +73,39 @@ Doesn't exist. The root `e2e` script from task 00 has no tests behind it.
 - **Summary:** explain *why*, not just *what*.
 - **Changed files:** the key files touched, one line each on why.
 - **Test results:** `npm test` output, plus `npm run e2e` for client or flow changes.
+
+## Implementation notes
+
+**Built**
+- `e2e/live-flow.spec.ts`:
+  - two consecutive updates replace each other on the receiver, which loads its document once and offers no editable field;
+  - a leak test records every request URL and outgoing WebSocket frame from both contexts and asserts that neither the key nor either plaintext is in any of them.
+- `e2e/corrupted-key.spec.ts`: a truncated key shows the invalid-key error; a wrong 32-byte key (every byte inverted) shows the integrity warning. In both, the sender text is absent from the body text and the page HTML, the heading still renders, and no page error or console error occurs.
+- `e2e/support/fixtures.ts`: a fresh sender context and receiver context per test, closed afterwards.
+- `e2e/support/session.ts`: start a session from home and read the link from the sender page; open a receiver; corrupt a key; record traffic; collect page errors.
+- `playwright.config.ts`: a running stack is reused locally but never with `CI` set.
+
+**Deviations**
+- None.
+
+**Decisions**
+- The live flow and the leak check are separate tests, matching the task's Tests list. The leak test repeats the two-update flow with recording attached before the first page opens.
+- The wrong key is the real key with every byte inverted. It is well-formed, guaranteed different, and needs no randomness. The truncated key drops the last five characters.
+- "Without a reload" is checked by counting the receiver page's `load` events, which must be exactly 1.
+- Console errors fail a test. None occurred, so nothing is filtered.
+- The e2e files are type-checked once with `tsc` under the strict base config, not through a new root script. A root typecheck for `e2e/` belongs to the scaffold.
+
+**Verified or corrected**
+- Playwright reports the receiver's navigation request without the `#` fragment (`/r/<id>`), so the request-URL check reflects what goes on the wire and needed no special case.
+- Every check was proven able to fail with planted faults in a throwaway spec, deleted afterwards:
+  - the key sent in a `fetch` query string and in a raw WebSocket frame: the leak assertions failed and named the offending URL and frame;
+  - a receiver reload: the load count was 2;
+  - the real key in place of a corrupted one: the text-absence assertion failed.
+- The guide's hand method for a wrong key (changing the first character after `#`) was run once as a script and gave the integrity warning.
+
+**Test results**
+- `npm run e2e`: 4 passed, three runs in a row (6.3 s, 6.1 s, 6.2 s), each starting the stack itself.
+- `npm test`: shared 262, server 113 and client 127, all passing.
+- `npm run typecheck`: passes in all workspaces. `tsc` over `e2e/` and `playwright.config.ts` with the strict base config: passes.
+- `grep -rnE "waitForTimeout|setTimeout|sleep" e2e/`: no matches.
+- Headless Chromium walkthrough with two contexts: 7 screenshots in `docs/guides/screenshots/07/`. See `docs/guides/07-test-guide.md`.
