@@ -26,7 +26,7 @@ Doesn't exist. The root `e2e` script from task 00 has no tests behind it.
   - well-formed key of the right length but with different bytes: the receiver joins, receives the latest envelope, fails to decrypt it, and shows the integrity warning.
   In both variants the sender's text appears nowhere on the receiver page, and the page stays usable (no blank screen, no uncaught error in the console).
 - Waiting for the debounced sender input (about 300 ms) relies on Playwright's auto-retrying assertions on the receiver's text, never on fixed sleeps.
-- Locators use what a user sees: roles, labels and visible text from the task 06 UI.
+- Locators use roles and accessible names from the task 06 UI. No test-only attributes.
 
 ## Security considerations
 - Invariant 1 (key and plaintext never reach the server): during the live flow, the test records every HTTP request URL and every outgoing WebSocket frame from both browser contexts, and asserts that neither the key from the link nor either plaintext appears in any of them.
@@ -40,7 +40,7 @@ Doesn't exist. The root `e2e` script from task 00 has no tests behind it.
 - [ ] End-to-end: a well-formed but wrong key shows the integrity warning and none of the sender's text.
 
 ## Acceptance criteria
-- [ ] `npm run e2e` starts server and client on its own and passes from a clean checkout after `npm install` and installing the Playwright Chromium browser.
+- [ ] `npm run e2e` starts server and client on its own and passes from a clean checkout after `npm ci` and installing the Playwright Chromium browser.
 - [ ] The receiver shows the first text and then the second text typed by the sender, without a reload, and the second replaces the first.
 - [ ] Opening the receiver link with a truncated key shows the invalid-key error, and the sender's text is not present anywhere on the receiver page.
 - [ ] Opening the receiver link with a wrong but well-formed key shows the integrity warning, and the sender's text is not present anywhere on the receiver page.

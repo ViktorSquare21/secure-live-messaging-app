@@ -55,7 +55,7 @@ Doesn't exist.
 - The seq is assigned inside the serialised step, at send time, never when a text is queued.
 - Empty text is a valid update and is published, so clearing the box clears the receiver.
 - Text whose envelope would exceed the task 02 size cap is not published; the service reports a too-long state instead.
-- It exposes the last-sent time (on a successful ack), peer status, and an error state for ack failures: not sender, bad token, slot taken, stale seq and unknown session (the session has ended, for example after a server restart).
+- It exposes the last-sent time (on a successful ack), peer status, and an error state for ack failures: not sender, bad token, slot taken, stale seq, unknown session (the session has ended, for example after a server restart), rate limited, and server busy on session create.
 - On reconnect it rejoins with its token, then publishes the current text with a new seq if the last text was not acknowledged.
 - Decision: the session id, sender token, key fragment and last used seq are kept in sessionStorage for the sender tab, so a page reload resumes the same session. The last used seq is stored before each publish, so a reload never reuses a seq. If nothing is stored for the session the sender page opens, the service reports that the session can't be resumed.
 

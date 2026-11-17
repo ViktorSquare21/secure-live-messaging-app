@@ -150,7 +150,7 @@ In the warning state the last good text stays on screen. In the key error state 
 
 ## Build plan
 
-Nine tasks, about 250 minutes of work (about 180 minutes elapsed if the server and client tasks run side by side).
+Nine tasks, about 275 minutes of work (about 205 minutes elapsed if the server and client tasks run side by side).
 
 | Step | Task |
 |---|---|

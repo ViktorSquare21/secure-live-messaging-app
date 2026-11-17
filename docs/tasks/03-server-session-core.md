@@ -2,7 +2,7 @@
 
 **Role:** Sender, Receiver
 **Surface:** Server, Tests
-**Estimate:** 35 min
+**Estimate:** 40 min
 **Depends on:** 02
 
 ## Goal
@@ -32,7 +32,7 @@ Doesn't exist.
 - A socket holds at most one slot in one session at a time.
 
 **Commands and their rules**
-- **Create:** stores a new session under the given id with the hashed token, no slots bound, no latest, and last activity set to now. Acknowledges with the session id and the sender token, so the shell can return them to the creating socket. Creating does not bind the creating socket to the sender slot; the sender joins separately.
+- **Create:** if the number of sessions has reached the session cap, nothing is stored and the ack is `server_busy`. Otherwise it stores a new session under the given id with the hashed token, no slots bound, no latest, and last activity set to now. Acknowledges with the session id and the sender token, so the shell can return them to the creating socket. Creating does not bind the creating socket to the sender slot; the sender joins separately.
 - **Join as sender** (session id, token, socket id): unknown session gives `unknown_session`. A token whose hash doesn't match gives `bad_token`; the comparison is constant-time over equal-length hashes. A socket that already holds a slot anywhere gives `slot_taken`. On success the socket is bound to the sender slot, the ack is ok, and both sides get a peer status (the sender learns whether a receiver is present; a present receiver is told the sender is connected).
 - **Sender takeover (decision):** if the sender slot is already held by another socket and the token matches, the new socket takes the slot and the old socket gets a disconnect effect. The receiver is not told about a disconnect, because a sender is still present. This lets a reconnecting sender publish again even before the server has noticed the old socket is gone.
 - **Join as receiver** (session id, socket id, optional rejoin token, freshly generated rejoin token): unknown session gives `unknown_session`. A socket that already holds a slot anywhere gives `slot_taken`. If the receiver slot is free, the socket is bound, the fresh rejoin token's hash replaces any stored one, and the ack is ok with the fresh rejoin token and the latest envelope when one exists.
@@ -41,8 +41,14 @@ Doesn't exist.
 - **Leave** (socket id): frees whichever slot the socket holds, sets last activity to now, and sends a disconnected peer status to the other side if present. The session, its latest envelope and its last accepted seq stay, so a sender can rejoin with the token and a receiver can rejoin and get the latest. A socket that holds no slot is a no-op with no effects.
 - **Expire** (now): removes every session that has neither slot bound and whose last activity is older than now minus the idle TTL. Sessions with a connected sender or receiver are never expired. Expiry produces no effects, since no sockets are attached.
 
+**Rate limiter**
+- A second pure function, separate from the session core, decides whether one more event is allowed. It takes a socket's limiter state for one event type, the current time and a limit (events per window), and returns allowed or not allowed plus the new limiter state. It reads no clock and keeps no state of its own; the shell (task 04) holds the state per socket.
+- It is a fixed window: at most the limit within one window, counted from the first event in it; the count resets when the window has passed.
+
 **Values**
 - Idle TTL: 30 minutes by default, passed in as configuration.
+- Session cap: 1,000 sessions by default, passed in as configuration.
+- Rate limits, passed in as configuration: session create at most 5 per minute per socket; message publish at most 10 per second per socket. The sender's 300 ms debounce produces about 3 per second, so normal typing never reaches the limit.
 - Last activity is updated by create, both joins, a successful publish and leave. Rejected commands don't update it.
 
 ## Security considerations
@@ -50,6 +56,7 @@ Doesn't exist.
 - **Invariant 3 (only the token holder publishes):** publishing is tied to the socket bound to the sender slot, which only a matching token can bind. Only a hash of the token is stored, and the comparison is constant-time, so neither a memory dump nor timing reveals a usable token.
 - **Invariant 4 (one sender, one receiver):** a second receiver gets `slot_taken`. A second sender socket can only replace the first by presenting the token, so there is never more than one sender bound.
 - **Invariant 5 (validate shape, don't trust roles):** every envelope passes the task 02 validator before it is stored or forwarded, and roles come only from the server's own slot bindings.
+- **Bounded memory:** the session cap, the idle TTL and the one-envelope-per-session rule together bound what the server can be made to hold.
 - The sender token is returned only in the create ack to the creating socket and never appears in any other effect.
 
 ## Tests
@@ -67,6 +74,8 @@ Doesn't exist.
 - [ ] Unit: sender takeover with the right token while the old sender socket is still bound gives a disconnect effect for the old socket, and publishing from the old socket afterwards gives `not_sender`.
 - [ ] Unit: peer status effects on joins tell each side whether the other is present.
 - [ ] Unit: expire removes a session with no bound slots that has been idle longer than the TTL, keeps one idle for less than the TTL, and keeps one older than the TTL that still has a bound socket.
+- [ ] Unit: create at the session cap gives `server_busy` and stores nothing; after expire removes a session, create succeeds again.
+- [ ] Unit: the rate limiter allows events up to the limit within a window, refuses the next one, and allows again once the window has passed; it never mutates the state it is given.
 - [ ] Unit: the core returns a new state and leaves the input state unchanged; calling it twice with the same inputs gives equal results.
 - [ ] Unit: the state stores a hash, not the raw sender token, and no effect other than the create ack contains the token.
 
@@ -75,6 +84,7 @@ Doesn't exist.
 - [ ] A publish is accepted only from the socket bound to the sender slot, only with a valid envelope and only with a seq strictly higher than the last accepted one; every other publish gets the matching error code and changes nothing.
 - [ ] A receiver that joins late gets the latest envelope in its join ack, and a present receiver gets every accepted envelope byte-for-byte.
 - [ ] A second receiver is refused with `slot_taken`, and a sender rejoining with the right token takes over the slot and disconnects the old sender socket.
+- [ ] Create is refused with `server_busy` at the session cap, and the rate limiter is a pure function with the limits above.
 - [ ] Sessions with no bound sockets are removed by expire once idle longer than the configured TTL, and never before.
 - [ ] All the unit tests above pass under `npm test`.
 
@@ -87,14 +97,14 @@ Doesn't exist.
 - Any UI (task 06).
 - Two-browser end-to-end tests (task 07).
 - Security headers and README (task 08).
-- A cap on the number of sessions or per-socket rate limiting.
+- Holding limiter state per socket and answering `rate_limited` on the wire (task 04).
 
 ## Notes / open questions
 - Decision: the idle TTL is 30 minutes, passed in as configuration. Change it if a different lifetime is wanted.
 - Decision: expiry only removes sessions with no bound sockets. A connected sender and receiver can stay idle indefinitely; their memory is bounded by open connections.
 - Decision: a sender rejoining with the right token while the old sender socket is still bound takes over the slot and the old socket is disconnected. As a result, `sender:join` returns `slot_taken` only when the joining socket already holds a slot.
 - Decision (D8): a receiver reconnecting before the server has noticed its old socket is gone proves it is the same receiver with its rejoin token and takes over at once. Without the token, takeover would let anyone with the link kick the real receiver.
-- Decision: publish checks run in the order not sender, invalid payload, stale seq, so an unauthorised socket learns nothing about payload rules or the current seq.
+- Decision: the core checks a publish in the order not sender, invalid payload, stale seq, so an unauthorised socket never learns the current seq. The shell (task 04) checks the payload shape before calling the core, so over the wire a malformed publish gets `invalid_payload` from any socket; that reveals only the payload rules, which are public.
 - Decision: unknown session is checked before the token, so `unknown_session` vs `bad_token` reveals whether an id exists. Session ids are random and already sit in the receiver link, so this leaks nothing useful.
 - Decision: creating a session under an id that already exists leaves the existing session untouched and acknowledges with a failure, so the shell can retry with a new id. With random ids of at least 128 bits this should never happen.
 

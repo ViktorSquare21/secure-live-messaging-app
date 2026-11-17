@@ -9,10 +9,10 @@
 ## Protocol (Socket.IO events, all with acks)
 | Event | From | Payload | Ack / effect |
 |---|---|---|---|
-| `session:create` | sender | – | `{ sessionId, senderToken }` |
+| `session:create` | sender | – | `{ sessionId, senderToken }` / `server_busy` / `rate_limited` |
 | `sender:join` | sender | `{ sessionId, senderToken }` | ok / `unknown_session` / `bad_token` / `slot_taken` |
 | `receiver:join` | receiver | `{ sessionId, rejoinToken? }` | ok + `rejoinToken` + `latest?` / `unknown_session` / `slot_taken` |
-| `message:publish` | sender | `Envelope` | ok / `not_sender` / `invalid_payload` / `stale_seq` |
+| `message:publish` | sender | `Envelope` | ok / `not_sender` / `invalid_payload` / `stale_seq` / `rate_limited` |
 | `message:update` | server → receiver | `Envelope` | – |
 | `peer:status` | server → both | `{ peer: 'connected' \| 'disconnected' }` | – |
 
@@ -31,10 +31,11 @@
 
 ## Tasks
 
-### T0. Scaffold (25 min)
+### T0. Scaffold (35 min)
 - npm workspaces: `shared`, `server`, `client`. Root scripts `dev`, `test`, `e2e`.
 - Angular LTS + Material (standalone components, Vitest runner). Server on Node + TS (`tsx` for dev).
 - Dev proxy from Angular to the server for `/socket.io` with `ws: true`.
+- Node 24 pinned (version file, `engines`, strict engine check). A Dockerfile and compose file run the app without Node on the host.
 - **Done when:** `npm test` runs empty suites in all three workspaces.
 
 ### T1. Crypto envelope in `shared/` (30 min)
@@ -45,13 +46,14 @@
 - Event-name constants, payload types, `isValidEnvelope` (shape, base64url, IV length, size cap).
 - **Tests:** accepts a valid envelope; rejects oversize, wrong types, a bad IV length and extra fields.
 
-### T3. Server session core, pure (35 min)
+### T3. Server session core, pure (40 min)
 - Reducer over `Map<sessionId, Session>`. Session = `{ senderTokenHash, senderSocketId?, receiverSocketId?, latest?, lastSeq, lastActivity }`.
 - Constant-time token comparison. Idle sessions expire after a TTL (pass `now` in).
+- A session cap (`server_busy`) and a pure per-socket rate limiter for create and publish.
 - **Tests:** create → join both → publish forwards to the receiver; a late receiver gets `latest`; a wrong token is rejected; a second receiver gets `slot_taken`; a receiver cannot publish; stale or duplicate seq is rejected; disconnect frees the slot; expire removes idle sessions.
 
-### T4. Socket.IO shell + integration tests (35 min)
-- `transports: ['websocket']`, origin allow-list, `maxHttpBufferSize` set, ack-based handlers, and a periodic expiry sweep.
+### T4. Socket.IO shell + integration tests (45 min)
+- `transports: ['websocket']`, origin allow-list, `maxHttpBufferSize` set, ack-based handlers, per-socket rate limits (`rate_limited`), and a periodic expiry sweep.
 - **Integration tests** (real server on port 0, `socket.io-client`): the full sender → receiver flow with **two consecutive updates** arriving in order; a receiver joining late gets the latest; forged publish from the receiver socket fails; a tampered envelope is relayed byte-for-byte (the server is blind) and the client-side decrypt rejects it; reconnecting the sender with its token restores publishing.
 
 ### T5. Angular services + pure receiver state (30 min)
@@ -74,7 +76,7 @@
 - Server security headers on the static build: strict CSP (`connect-src 'self'`), `Referrer-Policy: no-referrer`, `X-Content-Type-Options`.
 - README: architecture diagram, decisions D1–D8, threat model (what the server can and can't do), tests and how to run them, limitations, AI usage section.
 
-**Total ≈ 4h10.** If time runs short, cut T6 polish first, then the reconnect test in T5. Never cut T1, T3/T4 or T7, because they cover the core requirements.
+**Total ≈ 4h35.** The task files in `docs/tasks/` are more exact than this outline; where they differ, the task file wins. If time runs short, cut T6 polish first, then the reconnect test in T5. Never cut T1, T3/T4 or T7, because they cover the core requirements.
 
 ## Known limitations (README material)
 - The key in the fragment ends up in browser history and in anything the link is pasted into. Possible fix: `history.replaceState` to strip it after import.

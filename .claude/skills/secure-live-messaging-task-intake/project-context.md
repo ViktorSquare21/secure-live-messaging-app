@@ -31,14 +31,16 @@ A small web app where a **sender** shares a live-updating text with one **receiv
 
 Summary only. `docs/architecture-decisions.md` is the source of truth, with the reasoning and rejected alternatives.
 
-1. The server is an untrusted relay: no crypto, no key, no plaintext, memory only.
-2. Socket.IO with WebSocket transport only (no HTTP long-polling).
-3. AES-GCM-256 via WebCrypto, with a fresh random 96-bit IV per message. The session id and seq are bound in as authenticated data.
-4. A server-issued sender token authorises publishing. Signing keypairs are a possible future improvement. The sender's key, token and seq live in tab storage, never in the sender URL.
-5. npm workspaces: `shared/`, `server/`, `client/`.
-6. Vitest everywhere plus Playwright end-to-end.
-7. Plain-text rendering only.
-8. A receiver rejoin token lets a reconnecting receiver take its slot back.
+- **D1:** the server is an untrusted relay: no crypto, no key, no plaintext, memory only. AES-GCM-256 via WebCrypto, with a fresh random 96-bit IV per message; the session id and seq are bound in as authenticated data.
+- **D2:** Socket.IO with WebSocket transport only (no HTTP long-polling). Session rules are a pure module.
+- **D3:** Angular LTS + Angular Material.
+- **D4:** project docs live in `docs/`.
+- **D5:** a server-issued sender token authorises publishing. Signing keypairs are a possible future improvement. The sender's key, token and seq live in tab storage, never in the sender URL.
+- **D6:** npm workspaces: `shared/`, `server/`, `client/`.
+- **D7:** Vitest everywhere plus Playwright end-to-end.
+- **D8:** a receiver rejoin token lets a reconnecting receiver take its slot back.
+
+Plain-text rendering is not a numbered decision; it is invariant 6 below.
 
 ## 5. Security invariants (every task must keep these)
 

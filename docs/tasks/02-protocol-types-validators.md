@@ -30,7 +30,7 @@ Doesn't exist.
 | message:update | server → receiver | envelope |
 | peer:status | server → both | peer, either "connected" or "disconnected" |
 
-**Ack results**, also shared: success, or one error code from a fixed set: unknown_session, bad_token, slot_taken, not_sender, invalid_payload, stale_seq. The session:create ack carries the session id and sender token; the receiver:join success ack carries the receiver rejoin token and may carry the latest envelope.
+**Ack results**, also shared: success, or one error code from a fixed set: unknown_session, bad_token, slot_taken, not_sender, invalid_payload, stale_seq, server_busy, rate_limited. The session:create ack carries the session id and sender token; the receiver:join success ack carries the receiver rejoin token and may carry the latest envelope.
 
 **Envelope rules.** A payload is a valid envelope only when all of these hold:
 - It is a plain object with exactly four fields: v, seq, iv and ct. Any extra or missing field rejects it. Null, arrays and primitives are rejected.
@@ -88,6 +88,7 @@ Doesn't exist.
 - Decision: validators cover the join payloads and peer status, not only the envelope, because invariant 5 applies to every payload the server receives and the plan only named the envelope.
 - Decision: the session id is 16 random bytes and the sender token is 32 random bytes, both as unpadded base64url. The plan doesn't fix either format; task 04 must generate them to match.
 - Decision: the 64 KB cap from the plan applies to the encoded ciphertext length (65,536 characters). That keeps a full envelope comfortably under a transport limit set a little above it.
+- Decision: the envelope type and the base64url codec come from task 01, which runs first. This task adds the validators and the other payload types around them and doesn't define a second envelope type.
 - Decision: seq starts at 1, since the sender publishes lastSeq + 1 from an initial 0.
 - Decision: the minimum ciphertext is 16 bytes, the AES-GCM tag, so an empty text still produces a valid envelope.
 

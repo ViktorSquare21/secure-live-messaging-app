@@ -105,8 +105,8 @@ All unit level (pure, real WebCrypto in Vitest, no mocks):
 - Decision: the generated sender key is extractable so it can be exported; only the imported (receiver) key is non-extractable. If the sender tab should also hold a non-extractable key, the sender would re-import its own fragment after export; not done here.
 - Decision: a single leading `#` on the fragment is tolerated; everything else about the fragment is strict.
 - Decision: decrypt does its own minimal well-formedness checks so it never throws, instead of depending on the task 02 validator (task 02 is not a dependency). The two must agree on version 1, a 12-byte IV and unpadded base64url.
-- Decision: the base64url codec is owned by this task and reused by task 02. If task 02 has already written its own, keep one and delete the other.
-- Decision: the envelope shape (version, seq, IV, ciphertext) is produced here; if task 02 owns the canonical envelope type, this task uses that type rather than defining a second one.
+- Decision: the base64url codec is owned by this task and reused by task 02.
+- Decision: this task runs before task 02, so it defines the envelope type (version, seq, IV, ciphertext). Task 02 reuses that type rather than defining a second one.
 - Decision: encrypt refuses an invalid seq instead of returning a result, since that is a sender-side programming error, not untrusted input.
 - Decision: a ciphertext shorter than the 16-byte tag is malformed, not integrity_error, because no authentication can be attempted.
 

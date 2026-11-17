@@ -8,7 +8,7 @@ A sender shares live-updating text with one receiver through a link. Text is enc
 
 ## Stack and versions
 
-- **Node 24 LTS.** Angular 21 does not support Node 26. Set it in `engines` and `.nvmrc`.
+- **Node 24 LTS.** Angular 21 does not support Node 26. Set it in `engines`, `.nvmrc` and the Docker base image, with `engine-strict=true` in `.npmrc`.
 - **Angular 21 (LTS)** + Angular Material 21: standalone components, signals, zoneless change detection.
 - **Server:** Node + TypeScript + Socket.IO.
 - **Tests:** Vitest for unit and integration, Playwright for end-to-end.
@@ -47,7 +47,8 @@ A sender shares live-updating text with one receiver through a link. Text is enc
 - Bound the memory: cap the total number of sessions, rate-limit `session:create` and `message:publish` per socket, and expire idle sessions (the TTL is passed into the core as a value).
 - Logs carry event names, outcome codes and counts only: no ciphertext, tokens, keys or session ids.
 - When serving the built client, send these headers:
-  - `Content-Security-Policy`: `default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'`
+  - `Content-Security-Policy`: `default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'`
+  - `Cache-Control: no-store` on the index page
   - `Referrer-Policy: no-referrer`
   - `X-Content-Type-Options: nosniff`
 
@@ -55,7 +56,7 @@ A sender shares live-updating text with one receiver through a link. Text is enc
 - Render untrusted text only through interpolation (`{{ }}`) or form values. Never use `[innerHTML]`, `bypassSecurityTrust*`, `ElementRef.nativeElement.innerHTML`, or `document.write`.
 - No third-party origins: self-host fonts and icons, or use system fonts. No CDN links in `index.html`.
 - Set `optimization.styles.inlineCritical: false` in the production build. Critical-CSS inlining adds an inline event handler that the CSP blocks.
-- Keep Angular's Trusted Types support working: don't add code that writes HTML strings into the DOM.
+- Don't add code that writes HTML strings into the DOM. Trusted Types is not enforced by the CSP yet, and such code would block turning it on later.
 
 ### Dependencies
 - Add a dependency only when it removes real work. Prefer the platform: WebCrypto, `crypto`, RxJS, which already ships with Angular.
@@ -68,7 +69,7 @@ A sender shares live-updating text with one receiver through a link. Text is enc
 - Relay the envelope as received after validation. Don't copy, re-encode or re-serialize it.
 - Emit to the one receiver socket (`io.to(socketId)`), never broadcast.
 - The expiry sweep runs on an interval timer with `.unref()`, and is cleared on shutdown so tests exit cleanly.
-- Never block the event loop. No sync crypto or sync file I/O on the request path.
+- Never block the event loop. No sync file I/O and no slow sync crypto (key derivation, large buffers) on the request path. Hashing a 32-byte token with `createHash` is fine and keeps the session core pure and synchronous.
 
 ### Client
 - The sender pipeline is described under "RxJS" below.
@@ -134,7 +135,10 @@ Choose the flattening operator by what should happen when a new value arrives wh
 ## Commands
 - `npm ci`: install
 - `npm run dev`: server and client with the dev proxy
+- `docker compose up --build`: run the app without Node on the host (`http://localhost` only)
+- `docker compose run --rm dev <command>`: run any of these commands in the Node 24 dev container (the default when the host runs another Node major)
 - `npm test`: Vitest in all workspaces
+- `npm run typecheck`: type check all workspaces
 - `npm run e2e`: Playwright
 
 ## Writing in this repo

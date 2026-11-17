@@ -29,7 +29,7 @@ Run these checks before touching anything. If one fails, stop and report it; don
 1. The folder is a git repository with a clean working tree, and `origin` points at a GitHub repository.
 2. `gh auth status` succeeds.
 3. The task file `docs/tasks/<NN>-*.md` exists, with exactly one match.
-4. Every task listed in its **Depends on** line is `Done` in `docs/tasks/README.md` and its code is on the base branch.
+4. Every task listed in its **Depends on** line is `Done` in `docs/tasks/README.md` on the base branch, which means its pull request has been merged.
 5. The branch `feat-<NN>` doesn't exist yet, locally or on `origin`. If it does, ask whether to continue on it or stop.
 6. Node matches `.nvmrc` (Node 24), once task 00 has created it.
 
@@ -40,10 +40,13 @@ The base branch is the repository's default branch (`gh repo view --json default
 Read, in this order:
 
 1. The task file, completely.
-2. `docs/architecture-decisions.md` for every decision the task cites.
-3. The parts of `docs/implementation-plan.md` that cover the task (flow, protocol, crypto).
-4. The task files of its dependencies: their "Desired behaviour" and "Notes" sections name what this task builds on.
-5. The existing code in the workspaces the task's **Surface** line names.
+2. `.claude/skills/secure-live-messaging-task-intake/project-context.md`: the vocabulary and the seven security invariants that the tasks cite by number.
+3. `docs/architecture-decisions.md` for every decision the task cites.
+4. The parts of `docs/implementation-plan.md` that cover the task (flow, protocol, crypto).
+5. The task files of its dependencies: their "Desired behaviour" and "Notes" sections name what this task builds on.
+6. The existing code in the workspaces the task's **Surface** line names.
+
+When sources disagree on a detail, `CLAUDE.md` and the decisions file come first, then the task file, then the plan. The plan is an outline; the task files are more exact. A real conflict between `CLAUDE.md` and the task is a stop, as above.
 
 ## Step 3. Branch
 
@@ -72,7 +75,7 @@ Don't write code before the plan is approved. If the approved plan turns out wro
 - Write the tests from the task's "Tests" section, plus one negative test for every security rule the task touches.
 - Pure cores are tested directly: no mocks, no sockets. Integration tests start the real server on port 0 and close every client and the server afterwards.
 - Never wait with a fixed sleep. Use fake timers for debounce and backoff, and await events with a timeout.
-- Run `npm test` and the type check and lint for the touched workspaces. Everything must pass before you go on. A failing test is fixed in the code, or in the test if the test is wrong; it's never skipped or deleted to get green.
+- Run `npm test` and `npm run typecheck`, plus the lint script if the repo has one. Everything must pass before you go on. A failing test is fixed in the code, or in the test if the test is wrong; it's never skipped or deleted to get green.
 
 ## Step 7. End-to-end check with screenshots
 
@@ -132,7 +135,7 @@ For a task with no browser check, "Manual steps" holds the commands to run and t
 
 ## Step 10. Commit, push and open the PR
 
-1. Before staging, run the checks one last time: `npm test`, type check, lint, and `npm run e2e` if Step 7 applied. Then read the full diff and confirm it contains only this task.
+1. Before staging, run the checks one last time: `npm test`, `npm run typecheck`, the lint script if there is one, and `npm run e2e` if Step 7 applied. Then read the full diff and confirm it contains only this task.
 2. Stage files by name, never `git add -A`. Commit with a message in this form:
    ```
    feat(<surface>): <what the product can now do>
@@ -144,8 +147,9 @@ For a task with no browser check, "Manual steps" holds the commands to run and t
    End the message with the attribution line the session gives you.
 3. Push with `git push -u origin feat-<NN>`.
 4. Create the PR with `gh pr create` against the base branch. Write the body to a file in the scratchpad and pass it with `--body-file`. The body has:
-   - **Summary:** what the task adds, in two to four bullets.
+   - **Summary:** what the task adds and why, in two to four bullets.
    - **Task:** a link to the task file.
+   - **Changed files:** the key files touched, one line each on why.
    - **Acceptance criteria:** the task's list, ticked as met.
    - **Tests:** the commands run and their results.
    - **Screenshots:** each screenshot from Step 7 with a one-line caption. `gh` can't upload images, so reference the committed files by the pushed commit's SHA: `https://github.com/<owner>/<repo>/blob/<sha>/docs/guides/screenshots/<NN>/<file>.png?raw=true`. Leave the section out when there are none.

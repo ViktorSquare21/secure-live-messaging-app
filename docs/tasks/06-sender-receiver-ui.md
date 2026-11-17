@@ -12,7 +12,7 @@ A sender can start a session, copy the receiver link to share it on another plat
 As a sender, I want to start a session, copy a link and see whether my receiver is connected, so that I know my text is reaching them. As a receiver, I want to see the latest text live and a clear warning when an update is rejected or the link is broken, so that I never mistake bad data for the real text.
 
 ## Context
-The UI is the last layer over the client services and pure receiver state from task 05. Angular Material is a fixed requirement (D3). Plain-text rendering (D7 and invariant 6) and "keep the last good text on failure" (invariant 2) must be visible here, because this is where users see the results.
+The UI is the last layer over the client services and pure receiver state from task 05. Angular Material is a fixed requirement (D3). Plain-text rendering (invariant 6) and "keep the last good text on failure" (invariant 2) must be visible here, because this is where users see the results.
 
 ## Current behaviour
 Doesn't exist. Task 05 provides the socket service, the sender publish pipeline and the pure receiver reducer, but no pages.
@@ -23,11 +23,11 @@ Doesn't exist. Task 05 provides the socket service, the sender publish pipeline 
 - Three routes: home at the root, the sender page under the session path (no key in its URL; key, token and seq come from tab storage via task 05), and the receiver page under the receiver path with the key in the fragment. Unknown routes go to home.
 - Pages are thin. They wire user input into the task 05 services and display the state those services and the receiver reducer produce. No session rules, sequence checks or crypto decisions in the components.
 - All text the user typed or received is shown through normal Angular text binding, never as HTML. Line breaks and spacing are preserved by styling (pre-wrapped text), not by converting to markup.
-- Every element the end-to-end task needs (new-session button, sender textarea, receiver link, copy button, peer status, last-sent indicator, receiver text, receiver status, integrity banner, key error) gets a stable, dedicated test hook that doesn't depend on wording or Material's internal markup.
+- Every element the end-to-end task needs (new-session button, sender textarea, receiver link, copy button, peer status, last-sent indicator, receiver text, receiver status, integrity banner, key error) can be found by its role and accessible name (a button's name, a field's label, a status or alert region's label), not by Material's internal markup. No test-only attributes are added. The accessible names stay stable even if the surrounding wording is adjusted.
 
 **Home**
 - One "New session" button. Clicking it generates the key, creates the session through the task 05 service and navigates to the sender page.
-- The button is disabled while the request is in flight. If creating fails or the server is unreachable, a short error is shown and the button is enabled again.
+- The button is disabled while the request is in flight. If creating fails (including server busy or rate limited) or the server is unreachable, a short error is shown and the button is enabled again.
 
 **Sender page**
 - One multi-line text input (a large textarea) for the text. It is the only editable field in the app. Typing feeds the debounced publish pipeline from task 05; the page does nothing else with the text.
@@ -36,8 +36,8 @@ Doesn't exist. Task 05 provides the socket service, the sender publish pipeline 
 - A peer status chip: "Waiting for receiver" until a receiver joins, "Receiver connected" while one is present, "Receiver disconnected" after it leaves. While the sender's own connection is down the chip reads "Reconnecting…".
 - A last-sent indicator: "Not sent yet" before the first acknowledged publish, "Sending…" while a publish is unacknowledged, then "Sent at" with the local time of the last acknowledged publish.
 - The sender token never appears on the page or in the URL.
-- If the page is opened without a sender token for this session in the tab (for example the sender link pasted into another tab), or the server answers with an unknown session or a bad token, the textarea is disabled and a clear error is shown with a link back to home. A taken sender slot shows "This session is already open in another tab".
-- If the tab has no stored key and token for this session (for example the sender URL was opened in another tab), the page shows a "This session can't be resumed here" error instead of the editor.
+- If the tab has no stored key and token for this session (for example the sender URL was opened in another tab), the page shows a "This session can't be resumed here" error with a link back to home, instead of the text input.
+- If the server answers the sender join with an unknown session or a bad token, the text input is disabled and a clear error is shown with a link back to home. A taken sender slot shows "This session is already open in another tab".
 
 **Receiver page**
 - The key is read from the fragment and imported **before** joining. If it is missing or invalid, the page shows a key error ("This link is incomplete or damaged. Ask the sender for a new link.") and does not join the session, so it never takes the receiver slot and never shows text.
@@ -61,7 +61,7 @@ Doesn't exist. Task 05 provides the socket service, the sender publish pipeline 
 - [ ] Unit (component): the receiver page contains no input, textarea or editable element, and its displayed text changes when the state's text changes, without a reload.
 - [ ] Unit (component): the sender page shows the receiver link with the key in the fragment, and the copy button writes exactly that link to the clipboard (clipboard stubbed).
 - [ ] Unit (component): the peer status chip and last-sent indicator follow the service state through waiting, connected, sending and sent.
-- [ ] End-to-end: covered by task 07 using the test hooks added here.
+- [ ] End-to-end: covered by task 07, which finds the elements by the roles and accessible names given here.
 
 ## Acceptance criteria
 - [ ] Clicking "New session" on home lands on the sender page with a receiver link that opens a working receiver page in another browser.
@@ -71,7 +71,7 @@ Doesn't exist. Task 05 provides the socket service, the sender publish pipeline 
 - [ ] When an update fails verification, the receiver shows the red integrity banner and the previous text stays on screen; the next valid update clears the banner.
 - [ ] Opening the receiver link with a missing or altered key shows the key error, no text, and the sender still sees "Waiting for receiver".
 - [ ] The sender sees the peer chip change to "Receiver connected" and back when the receiver tab closes, and the last-sent time updates after each acknowledged publish.
-- [ ] Every element listed under test hooks can be found by a stable test hook.
+- [ ] Every element the end-to-end task needs can be found by its role and accessible name.
 
 ## Out of scope
 - Workspace, Angular and Material setup, dev proxy (task 00).
