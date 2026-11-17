@@ -63,32 +63,32 @@ The shared workspace offers five operations: generate a key, export a key to a l
 
 ## Tests
 All unit level (pure, real WebCrypto in Vitest, no mocks):
-- [ ] Unit: round-trip. A generated key, encrypting a text at seq 1 and decrypting it with the same session id returns ok with the identical text and seq 1.
-- [ ] Unit: round-trip through the link. Exporting the key, importing the fragment, and decrypting with the imported key returns ok with the original text.
-- [ ] Unit: round-trip of non-ASCII text (accented letters, emoji, line breaks) and of an empty string returns the exact original.
-- [ ] Unit: flipping one bit in the ciphertext returns integrity_error and no plaintext.
-- [ ] Unit: flipping one bit in the authentication tag (last ciphertext byte) returns integrity_error.
-- [ ] Unit: flipping one bit in the IV returns integrity_error.
-- [ ] Unit: decrypting with a different generated key returns integrity_error.
-- [ ] Unit: changing the envelope seq (for example 5 to 6, and 5 to 4) returns integrity_error.
-- [ ] Unit: decrypting with a different session id than the one used to encrypt returns integrity_error.
-- [ ] Unit: encrypting the same plaintext twice with the same key, session id and seq gives different IVs and different ciphertexts; a batch of 1000 encryptions produces 1000 distinct IVs.
-- [ ] Unit: every envelope has version 1, an IV of 16 base64url characters that decodes to 12 bytes, and a ciphertext exactly 16 bytes longer than the UTF-8 plaintext.
-- [ ] Unit: an exported fragment is 43 characters, contains only the base64url alphabet, and has no padding.
-- [ ] Unit: importing a fragment with a single leading `#` succeeds and decrypts the same envelopes.
-- [ ] Unit: importing a malformed fragment returns malformed and does not throw, for each of: empty, 42 characters, 44 characters, padded with `=`, containing `+` or `/`, containing whitespace, containing a non-alphabet character, and a valid-looking value that decodes to the wrong byte count.
-- [ ] Unit: an imported key reports itself as non-extractable, and attempting to export it fails.
-- [ ] Unit: decrypt returns malformed (and does not throw) for: a non-object, a missing field, version 2, seq as a string, zero, negative or fractional seq, an IV that decodes to 11 or 13 bytes, an IV or ciphertext that is not valid base64url, and a ciphertext shorter than 16 bytes.
-- [ ] Unit: encrypt refuses seq 0, a negative seq, a fractional seq and not-a-number.
-- [ ] Unit: for every failing case above, the result contains no plaintext field and its text does not include the original plaintext.
+- [x] Unit: round-trip. A generated key, encrypting a text at seq 1 and decrypting it with the same session id returns ok with the identical text and seq 1.
+- [x] Unit: round-trip through the link. Exporting the key, importing the fragment, and decrypting with the imported key returns ok with the original text.
+- [x] Unit: round-trip of non-ASCII text (accented letters, emoji, line breaks) and of an empty string returns the exact original.
+- [x] Unit: flipping one bit in the ciphertext returns integrity_error and no plaintext.
+- [x] Unit: flipping one bit in the authentication tag (last ciphertext byte) returns integrity_error.
+- [x] Unit: flipping one bit in the IV returns integrity_error.
+- [x] Unit: decrypting with a different generated key returns integrity_error.
+- [x] Unit: changing the envelope seq (for example 5 to 6, and 5 to 4) returns integrity_error.
+- [x] Unit: decrypting with a different session id than the one used to encrypt returns integrity_error.
+- [x] Unit: encrypting the same plaintext twice with the same key, session id and seq gives different IVs and different ciphertexts; a batch of 1000 encryptions produces 1000 distinct IVs.
+- [x] Unit: every envelope has version 1, an IV of 16 base64url characters that decodes to 12 bytes, and a ciphertext exactly 16 bytes longer than the UTF-8 plaintext.
+- [x] Unit: an exported fragment is 43 characters, contains only the base64url alphabet, and has no padding.
+- [x] Unit: importing a fragment with a single leading `#` succeeds and decrypts the same envelopes.
+- [x] Unit: importing a malformed fragment returns malformed and does not throw, for each of: empty, 42 characters, 44 characters, padded with `=`, containing `+` or `/`, containing whitespace, containing a non-alphabet character, and a valid-looking value that decodes to the wrong byte count.
+- [x] Unit: an imported key reports itself as non-extractable, and attempting to export it fails.
+- [x] Unit: decrypt returns malformed (and does not throw) for: a non-object, a missing field, version 2, seq as a string, zero, negative or fractional seq, an IV that decodes to 11 or 13 bytes, an IV or ciphertext that is not valid base64url, and a ciphertext shorter than 16 bytes.
+- [x] Unit: encrypt refuses seq 0, a negative seq, a fractional seq and not-a-number.
+- [x] Unit: for every failing case above, the result contains no plaintext field and its text does not include the original plaintext.
 
 ## Acceptance criteria
-- [ ] A text encrypted by the sender for a session and seq decrypts to the identical text on the receiver side only with the same key, session id and seq.
-- [ ] A single flipped bit in the ciphertext, tag or IV, a wrong key, a changed seq, or a different session id each yields integrity_error with no plaintext.
-- [ ] A broken link fragment yields malformed from key import, and a broken envelope yields malformed from decrypt; neither ever throws.
-- [ ] Two encryptions of the same text never share an IV.
-- [ ] The receiver's imported key cannot be exported.
-- [ ] The same module runs unchanged in the browser and under Node in Vitest, and `npm test` passes in the shared workspace.
+- [x] A text encrypted by the sender for a session and seq decrypts to the identical text on the receiver side only with the same key, session id and seq.
+- [x] A single flipped bit in the ciphertext, tag or IV, a wrong key, a changed seq, or a different session id each yields integrity_error with no plaintext.
+- [x] A broken link fragment yields malformed from key import, and a broken envelope yields malformed from decrypt; neither ever throws.
+- [x] Two encryptions of the same text never share an IV.
+- [x] The receiver's imported key cannot be exported.
+- [x] The same module runs unchanged in the browser and under Node in Vitest, and `npm test` passes in the shared workspace.
 
 ## Out of scope
 - Scaffolding the workspaces and test runners (task 00).
@@ -116,3 +116,33 @@ All unit level (pure, real WebCrypto in Vitest, no mocks):
 - **Summary:** explain *why*, not just *what*.
 - **Changed files:** the key files touched, one line each on why.
 - **Test results:** `npm test` output, plus `npm run e2e` for client or flow changes.
+
+## Implementation notes
+
+**Built:**
+- `shared/src/base64url.ts`: a strict, unpadded base64url codec. `decodeBase64Url` returns `null` for padding, `+`, `/`, whitespace, any non-alphabet character, a length remainder of one, and any value that doesn't re-encode to itself.
+- `shared/src/envelope.ts`: the `Envelope` type (`{ v: 1, seq, iv, ct }`), the size constants, `isPositiveSafeSeq`, `buildAad` (the single place the `slm:v1|<sessionId>|<seq>` AAD is built) and `parseEnvelope`, the pure well-formedness check decrypt runs before any crypto.
+- `shared/src/crypto-envelope.ts`: `generateKey`, `exportKeyToFragment`, `importKeyFromFragment` (result, non-extractable key), `encrypt` (fresh 12-byte IV per call, 128-bit tag) and `decrypt`, which always resolves to `ok | integrity_error | malformed`.
+- `shared/src/index.ts` re-exports all of it for the client, the server and task 02.
+
+**Deviations:**
+- The plan named a static scan of the source files as the invariant 1 test. The shared workspace has no Node typings, so a test reading files would need a new dev dependency. It was replaced by a runtime test that spies on `fetch` and every `console` method through a full flow, including failures. Node-only imports are already blocked by the shared typecheck, which uses only the browser typings.
+
+**Decisions:**
+- Envelope field names are `v`, `seq`, `iv` and `ct`, as in the implementation plan.
+- Decrypt treats an envelope with unknown extra fields as malformed, the same as the server's "unknown fields are rejected" rule, so task 02 and decrypt agree.
+- Encrypt throws `RangeError('invalid_seq')` for an invalid seq. The message carries none of the inputs.
+- Keys are typed as `SessionKey = InstanceType<typeof CryptoKey>`. The server's Node typings declare only the `CryptoKey` value globally, not the type, and this resolves in both the DOM and Node typings without touching the server config.
+- Authentic bytes that aren't valid UTF-8 resolve to malformed (strict `TextDecoder`), so decrypt never hands the UI replacement characters from a forged envelope made by someone holding the key.
+- Decrypt wraps the shape check in its own try/catch, so even a hostile object (a proxy whose key listing throws) resolves to malformed.
+
+**Verified or corrected:**
+- Checked that the tests catch real faults by planting three of them one at a time: a constant IV (2 tests failed), the seq dropped from the AAD (4 failed), and the canonical re-encode check removed from the decoder (3 failed). The source was restored after each.
+- Checked that `@types/node` declares no global `CryptoKey` type before choosing the key type, and confirmed with the server typecheck, which compiles the shared source under Node typings.
+- The first manual run with `tsx -e` failed because it compiles to CommonJS, which has no top-level await. The guide wraps the script in an async function.
+
+**Test results:**
+- `docker compose run --rm dev npm test`: shared 115, server 14, client 4 tests, all passing.
+- `docker compose run --rm dev npm run typecheck`: passes in all three workspaces.
+- `docker compose run --rm dev npm audit --omit=dev`: 0 vulnerabilities.
+- No lint script in the repo. No browser check: this task touches only `shared/`.
