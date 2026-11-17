@@ -4,11 +4,9 @@ services:
       context: .
       target: app
     init: true
+    # The app and the relay share one origin here, so the server's same-origin check needs no ALLOWED_ORIGINS.
     ports:
-      - "127.0.0.1:${CLIENT_PORT:-4200}:4200"
-    environment:
-      # The browser's Origin carries the published host port, so the server's allow-list must follow CLIENT_PORT.
-      ALLOWED_ORIGINS: "http://localhost:${CLIENT_PORT:-4200},http://127.0.0.1:${CLIENT_PORT:-4200}"
+      - "127.0.0.1:${CLIENT_PORT:-4200}:3000"
 
   dev:
     profiles: ["dev"]

@@ -1,6 +1,11 @@
-import { resolveServerPort, SERVER_HOST } from './config';
+import { fileURLToPath } from 'node:url';
+import { resolveServerHost, resolveServerPort } from './config';
 import { startServer } from './create-server';
 import { resolveOriginPolicy } from './origin-policy';
+import { loadStaticSite } from './static-files';
+import type { StaticSite } from './static-site';
+
+const CLIENT_BUILD_DIR = fileURLToPath(new URL('../../client/dist/client/browser', import.meta.url));
 
 const portResult = resolveServerPort(process.env);
 if (!portResult.ok) {
@@ -14,8 +19,23 @@ if (!originResult.ok) {
   process.exit(1);
 }
 
-const server = await startServer({ port: portResult.port, host: SERVER_HOST, originPolicy: originResult.policy });
-console.log(`server_listening port=${server.port}`);
+let staticSite: StaticSite | undefined;
+if (process.env['NODE_ENV'] === 'production') {
+  try {
+    staticSite = await loadStaticSite(CLIENT_BUILD_DIR);
+  } catch {
+    console.error('server_start_failed missing_client_build');
+    process.exit(1);
+  }
+}
+
+const server = await startServer({
+  port: portResult.port,
+  host: resolveServerHost(process.env),
+  originPolicy: originResult.policy,
+  staticSite,
+});
+console.log(`server_listening port=${server.port} static=${staticSite === undefined ? 'off' : 'on'}`);
 
 const shutdown = (): void => {
   server.close().then(

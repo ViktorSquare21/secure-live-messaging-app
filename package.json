@@ -13,9 +13,11 @@
   ],
   "scripts": {
     "dev": "concurrently --kill-others --names server,client \"npm run dev -w @slm/server\" \"npm run start -w @slm/client\"",
+    "build": "npm run build -w @slm/client",
+    "start": "npm run build && npm run start -w @slm/server",
     "test": "npm run test --workspaces",
     "typecheck": "npm run typecheck --workspaces",
-    "e2e": "playwright test --pass-with-no-tests"
+    "e2e": "npm run build && playwright test --pass-with-no-tests"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",
