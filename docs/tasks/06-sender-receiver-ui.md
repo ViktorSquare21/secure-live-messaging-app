@@ -140,6 +140,7 @@ Doesn't exist. Task 05 provides the socket service, the sender publish pipeline 
 - Sender join errors `unknown_session`, `bad_token` and `slot_taken` are fatal: the input is disabled and a link leads home. Publish rejections such as `stale_seq` or `rate_limited` are shown but typing continues.
 - A receiver join refused with `invalid_payload` (a malformed id in the path) shows the "doesn't exist or has ended" message.
 - The connect timeout for creating a session is 5 s, the same as the ack timeout.
+- The altered-but-valid key case is accepted as a known limitation for the README. A key-check value in the protocol would close it. Until then that link joins, and every update shows the integrity banner.
 
 **Verified or corrected**
 - The first connect timeout returned an error value that flowed on into the ack parser, where it was overwritten by `protocol_error`. A spec caught this. The timeout now throws a dedicated error that `catchError` maps to `unreachable`.
