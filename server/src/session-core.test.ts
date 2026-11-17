@@ -423,10 +423,14 @@ describe('session core: purity and token handling', () => {
   it.each(commands.map((command) => [command.type, command] as const))(
     '%s returns a new state, leaves the input unchanged and gives equal results for equal inputs',
     (_type, command) => {
-      const state = publish(bothJoined(), envelope(1)).state;
+      const idleSessionId = encodeBase64Url(new Uint8Array(16).fill(9));
+      const withIdle = run(bothJoined(), { type: 'create', sessionId: idleSessionId, senderToken: SENDER_TOKEN }).state;
+      const state = publish(withIdle, envelope(1)).state;
       const before = structuredClone(state);
       const first = run(state, command, T0 + 2 * TTL);
       const second = run(state, command, T0 + 2 * TTL);
+      expect(first.state).not.toBe(state);
+      expect(first.state).not.toEqual(state);
       expect(state).toEqual(before);
       expect(first).toEqual(second);
     },
