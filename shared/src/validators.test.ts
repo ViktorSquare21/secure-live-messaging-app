@@ -75,11 +75,11 @@ describe('isValidEnvelope', () => {
     expect(isValidEnvelope({ ...envelope, ct: atCap })).toBe(true);
   });
 
-  test('rejects a ciphertext of 65,537 characters', () => {
+  test('rejects a ciphertext of 65,537 characters, a length that is also never valid base64url', () => {
     expect(isValidEnvelope({ ...envelope, ct: 'A'.repeat(MAX_CIPHERTEXT_CHARS + 1) })).toBe(false);
   });
 
-  test('rejects a ciphertext of 65,538 characters that would otherwise decode', () => {
+  test('rejects a well-formed ciphertext of 65,538 characters, which only the size cap catches', () => {
     expect(isValidEnvelope({ ...envelope, ct: 'A'.repeat(MAX_CIPHERTEXT_CHARS + 2) })).toBe(false);
   });
 
@@ -99,7 +99,7 @@ describe('isValidEnvelope', () => {
     ['ct as a number', { ...envelope, ct: 16 }],
     ['an IV of 11 bytes', { ...envelope, iv: base64UrlOf(11) }],
     ['an IV of 13 bytes', { ...envelope, iv: base64UrlOf(13) }],
-    ['an IV with "="', { ...envelope, iv: `${iv}=` }],
+    ['an IV with "="', { ...envelope, iv: `${iv.slice(1)}=` }],
     ['an IV with "+"', { ...envelope, iv: `${iv.slice(1)}+` }],
     ['an IV with "/"', { ...envelope, iv: `${iv.slice(1)}/` }],
     ['a ciphertext of 15 bytes', { ...envelope, ct: base64UrlOf(15) }],

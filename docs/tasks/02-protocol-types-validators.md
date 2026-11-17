@@ -121,6 +121,7 @@ Doesn't exist.
 **Verified or corrected:**
 - Checked that the tests catch real faults by planting three of them one at a time: the size cap removed (3 tests failed), the try/catch in the validators removed (5 failed), and the plain-object prototype check removed (2 failed). The source was restored after each and compared byte for byte with a saved copy.
 - The task's 65,537-character test alone would not prove the cap (see Deviations); caught while choosing the fixtures.
+- The acceptance-criteria review found the "IV with `=`" fixture was 17 characters, so the decoder rejected it for its length before reaching the character rule. It now keeps the IV at 16 characters. The two oversized-ciphertext tests were renamed to say which one proves the cap.
 
 **Test results:**
 - `docker compose run --rm dev npm test`: shared 262, server 14, client 4 tests, all passing.
