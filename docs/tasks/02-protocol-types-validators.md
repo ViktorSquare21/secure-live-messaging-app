@@ -58,22 +58,22 @@ Doesn't exist.
 - Rejecting extra fields stops a client from smuggling data (for example a claimed role) through the relay. The server never takes a role from the payload.
 
 ## Tests
-- [ ] Unit: a valid envelope (v 1, seq 1, 12-byte IV, 16-byte ciphertext) is accepted.
-- [ ] Unit: an envelope whose ciphertext is exactly 65,536 characters is accepted, and one at 65,537 characters is rejected.
-- [ ] Unit: wrong types are rejected one field at a time: v as 2 or "1", seq as "1", 0, -1, 1.5, NaN or Infinity, iv or ct as a number.
-- [ ] Unit: an IV decoding to 11 or 13 bytes is rejected; an IV with "=", "+" or "/" is rejected.
-- [ ] Unit: a ciphertext shorter than 16 bytes, or empty, is rejected.
-- [ ] Unit: an envelope with an extra field, or with a missing field, is rejected; null, an array, a string and undefined are rejected without throwing.
-- [ ] Unit: sender:join and receiver:join payloads with a correctly sized id and token are accepted; a 21- or 23-character id, a non-base64url id, a missing token, and an extra field are each rejected.
-- [ ] Unit: peer status accepts "connected" and "disconnected" and rejects any other value or extra field.
+- [x] Unit: a valid envelope (v 1, seq 1, 12-byte IV, 16-byte ciphertext) is accepted.
+- [x] Unit: an envelope whose ciphertext is exactly 65,536 characters is accepted, and one at 65,537 characters is rejected.
+- [x] Unit: wrong types are rejected one field at a time: v as 2 or "1", seq as "1", 0, -1, 1.5, NaN or Infinity, iv or ct as a number.
+- [x] Unit: an IV decoding to 11 or 13 bytes is rejected; an IV with "=", "+" or "/" is rejected.
+- [x] Unit: a ciphertext shorter than 16 bytes, or empty, is rejected.
+- [x] Unit: an envelope with an extra field, or with a missing field, is rejected; null, an array, a string and undefined are rejected without throwing.
+- [x] Unit: sender:join and receiver:join payloads with a correctly sized id and token are accepted; a 21- or 23-character id, a non-base64url id, a missing token, and an extra field are each rejected.
+- [x] Unit: peer status accepts "connected" and "disconnected" and rejects any other value or extra field.
 
 ## Acceptance criteria
-- [ ] Every event name and ack error code from the protocol table is available from the shared workspace, and no other workspace needs to spell them out.
-- [ ] The envelope validator accepts exactly the shape described above and rejects every case listed under Tests.
-- [ ] Join payloads and the peer status payload have their own validators with the rules above.
-- [ ] No validator throws on any input, including null, undefined, arrays and deeply nested objects.
-- [ ] The size and length limits are exported as named constants, not repeated as literals elsewhere.
-- [ ] npm test passes in the shared workspace with the new unit tests.
+- [x] Every event name and ack error code from the protocol table is available from the shared workspace, and no other workspace needs to spell them out.
+- [x] The envelope validator accepts exactly the shape described above and rejects every case listed under Tests.
+- [x] Join payloads and the peer status payload have their own validators with the rules above.
+- [x] No validator throws on any input, including null, undefined, arrays and deeply nested objects.
+- [x] The size and length limits are exported as named constants, not repeated as literals elsewhere.
+- [x] npm test passes in the shared workspace with the new unit tests.
 
 ## Out of scope
 - Workspace setup and test runner configuration (task 00).
@@ -98,3 +98,32 @@ Doesn't exist.
 - **Summary:** explain *why*, not just *what*.
 - **Changed files:** the key files touched, one line each on why.
 - **Test results:** `npm test` output, plus `npm run e2e` for client or flow changes.
+
+## Implementation notes
+
+**Built:**
+- `shared/src/protocol.ts`: the `EVENTS` name map, `ACK_ERROR_CODES`, `PEER_STATES`, the payload types (`SenderJoinPayload`, `ReceiverJoinPayload`, `PeerStatusPayload`), the ack types (`{ ok: true, … } | { ok: false, error }`), and the limits `SESSION_ID_BYTES`, `TOKEN_BYTES`, `SESSION_ID_LENGTH` (22) and `TOKEN_LENGTH` (43), with the lengths derived from the byte counts.
+- `shared/src/validators.ts`: `isValidEnvelope`, `isValidSenderJoin`, `isValidReceiverJoin`, `isValidPeerStatus`, `isSessionId` and `isToken`. Each returns a boolean type guard and catches anything a hostile input throws.
+- `shared/src/object-shape.ts`: `hasExactKeys`, the plain-object and exact-field check shared by the envelope parser and the validators.
+- `shared/src/envelope.ts`: `MAX_CIPHERTEXT_CHARS` (65,536), checked before the ciphertext is decoded, so decrypt and the server-side validator reject the same oversized envelopes.
+- `shared/src/index.ts` re-exports all of it.
+
+**Deviations:**
+- None from the task. One addition to the test list: a 65,537-character string can never be valid base64url (a length remainder of one), so it would be rejected even without the cap. The tests also check a 65,538-character ciphertext that decodes cleanly, which only the cap rejects.
+
+**Decisions:**
+- The receiver join field is named `rejoinToken`, as in the implementation plan's protocol table.
+- Acks are a discriminated union on `ok`, with `error` holding one of the eight codes.
+- Class instances are rejected as not plain objects; objects with a null prototype are accepted, since their fields are checked the same way and JSON never produces either.
+- `hasExactKeys` lives in its own module so `envelope.ts` and `validators.ts` don't import each other.
+- No typed Socket.IO event-map interfaces: they would type inbound payloads as trusted before validation. Tasks 04 and 05 can add them around the validators.
+
+**Verified or corrected:**
+- Checked that the tests catch real faults by planting three of them one at a time: the size cap removed (3 tests failed), the try/catch in the validators removed (5 failed), and the plain-object prototype check removed (2 failed). The source was restored after each and compared byte for byte with a saved copy.
+- The task's 65,537-character test alone would not prove the cap (see Deviations); caught while choosing the fixtures.
+
+**Test results:**
+- `docker compose run --rm dev npm test`: shared 262, server 14, client 4 tests, all passing.
+- `docker compose run --rm dev npm run typecheck`: passes in all three workspaces.
+- `docker compose run --rm dev npm audit --omit=dev`: 0 vulnerabilities.
+- No lint script in the repo. No browser check: this task touches only `shared/`.
