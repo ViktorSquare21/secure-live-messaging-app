@@ -1,8 +1,7 @@
 import type { PeerState } from '@slm/shared';
 import type { ReceiverError } from '../session/receiver-session.service';
 import type { ReceiverStatus } from '../session/receiver-state';
-import type { SenderError } from '../session/sender-core';
-import type { ConnectionState } from '../session/session-socket';
+import type { SenderConnection, SenderError } from '../session/sender-core';
 
 export type PeerPhase = 'waiting' | 'connected' | 'left';
 
@@ -19,7 +18,7 @@ const PEER_LABELS: Record<PeerPhase, string> = {
   left: 'Receiver disconnected',
 };
 
-export function senderPeerLabel(connection: ConnectionState, phase: PeerPhase): string {
+export function senderPeerLabel(connection: SenderConnection, phase: PeerPhase): string {
   return connection === 'disconnected' ? 'Reconnecting…' : PEER_LABELS[phase];
 }
 

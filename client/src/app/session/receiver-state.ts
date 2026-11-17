@@ -6,6 +6,7 @@ export interface ReceiverState {
   readonly text: string;
   readonly lastSeq: number | null;
   readonly status: ReceiverStatus;
+  readonly integrityWarning: boolean;
 }
 
 export type ReceiverEvent =
@@ -13,7 +14,12 @@ export type ReceiverEvent =
   | { readonly type: 'disconnected' }
   | { readonly type: 'rejoined' };
 
-export const initialReceiverState: ReceiverState = { text: '', lastSeq: null, status: 'waiting' };
+export const initialReceiverState: ReceiverState = {
+  text: '',
+  lastSeq: null,
+  status: 'waiting',
+  integrityWarning: false,
+};
 
 export function receiverTransition(state: ReceiverState, event: ReceiverEvent): ReceiverState {
   switch (event.type) {
@@ -32,9 +38,9 @@ function applyEnvelope(state: ReceiverState, event: Extract<ReceiverEvent, { typ
   if (!isValidEnvelope(event.envelope) || result.status !== 'ok') return rejected(state);
   if (event.type === 'resync' && result.seq === state.lastSeq) return { ...state };
   if (state.lastSeq !== null && result.seq <= state.lastSeq) return rejected(state);
-  return { text: result.text, lastSeq: result.seq, status: 'live' };
+  return { text: result.text, lastSeq: result.seq, status: 'live', integrityWarning: false };
 }
 
 function rejected(state: ReceiverState): ReceiverState {
-  return { ...state, status: 'integrity_error' };
+  return { ...state, status: 'integrity_error', integrityWarning: true };
 }

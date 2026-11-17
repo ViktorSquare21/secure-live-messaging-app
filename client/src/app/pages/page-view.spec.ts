@@ -27,11 +27,12 @@ describe('nextPeerPhase', () => {
 });
 
 describe('senderPeerLabel', () => {
-  it('labels each phase and says reconnecting while the sender is offline', () => {
+  it('labels each phase, and says reconnecting only after a connection was lost', () => {
     expect(senderPeerLabel('connected', 'waiting')).toBe('Waiting for receiver');
     expect(senderPeerLabel('reconnected', 'connected')).toBe('Receiver connected');
     expect(senderPeerLabel('connected', 'left')).toBe('Receiver disconnected');
     expect(senderPeerLabel('disconnected', 'connected')).toBe('Reconnecting…');
+    expect(senderPeerLabel('connecting', 'waiting')).toBe('Waiting for receiver');
   });
 });
 

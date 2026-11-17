@@ -24,7 +24,7 @@ docker compose run --rm dev npm run build -w @slm/client
 docker compose run --rm dev npm audit --omit=dev
 ```
 Result:
-- **Tests:** shared 262, server 113 and client 127, all passing.
+- **Tests:** shared 262, server 113 and client 131, all passing.
 - **Type check:** passes in all three workspaces.
 - **Client build:** no budget warnings. The initial bundle is 272.47 kB raw, 74.80 kB transferred.
 - **Audit:** 0 vulnerabilities.
@@ -34,8 +34,8 @@ The specs for this task are in `client/src/app/pages/`:
 | Spec | Tests | What it covers |
 |---|---|---|
 | `page-view.spec.ts` | 10 | The pure labels and peer phase. |
-| `receiver.page.spec.ts` | 11 | Real WebCrypto with a fake socket. |
-| `sender.page.spec.ts` | 13 | The sender page; the clipboard is stubbed. |
+| `receiver.page.spec.ts` | 12 | Real WebCrypto with a fake socket. |
+| `sender.page.spec.ts` | 14 | The sender page; the clipboard is stubbed. |
 | `home.page.spec.ts` | 2 | The home page. |
 | `no-html-sinks.spec.ts` | 1 | No source file under `src/app` writes HTML into the DOM or bypasses the sanitiser. |
 
@@ -96,7 +96,7 @@ The screenshots come from a headless Chromium run at 1280×800 against `npm run 
    ![Sender URL opened in another browser](screenshots/06/11-sender-url-in-other-tab.png)
 
 ## Not covered
-- **Integrity banner in a browser.** A real server only relays envelopes the sender encrypted, so a tampered or replayed update can't be produced from the UI. The component spec drives the real receiver service with a tampered envelope and with a replayed seq. It checks that the red "Integrity warning" banner appears, that the previous text stays exactly, and that the next valid update clears the banner. End-to-end coverage with a corrupted link comes in task 07.
+- **Integrity banner in a browser.** A real server only relays envelopes the sender encrypted, so a tampered or replayed update can't be produced from the UI. The component spec drives the real receiver service with a tampered envelope and with a replayed seq. It checks that the red "Integrity warning" banner appears, that the previous text stays exactly, and that the next valid update clears the banner. It also checks that the banner stays through a disconnect and rejoin. End-to-end coverage with a corrupted link comes in task 07.
 - **A different but well-formed key.** If a fragment is still a valid 32-byte key but not the session's key, it imports without error. The receiver then joins, and every update shows the integrity banner instead of the key error. Only a fragment that doesn't decode to a 32-byte key gives the key error.
 - **"Reconnecting…" on the sender and an unreachable server on home.** These are covered by the component and service specs, not by hand.
 - **Sender join refusals:** unknown session, bad token and taken slot. The sender page spec covers these. A browser can't produce them without editing sessionStorage.
