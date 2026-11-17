@@ -8,7 +8,7 @@ A sender types into a text box and one receiver, who has opened a link from the 
 
 ### Prerequisites
 
-- **Node 24 LTS** (`.nvmrc`). The repo sets `engine-strict=true`, so `npm ci` fails on purpose on any other major.
+- **Node 24 LTS** (`.nvmrc`). The repo sets `engine-strict=true`, so `npm ci` fails on purpose on any other major. The npm scripts set no variables through shell syntax, so they run the same on macOS, Linux and Windows.
 - Or **Docker with Compose v2**, with no Node on the host at all.
 
 Open the app at `http://localhost:<port>`, never a LAN IP: WebCrypto works only on `https` or `localhost`.
@@ -43,7 +43,7 @@ Starts the Socket.IO server on `127.0.0.1:3000` and the Angular dev server on `h
 npm start
 ```
 
-Builds the client (`npm run build`), then starts the server with `NODE_ENV=production`. The server serves the built app and the Socket.IO relay from one origin at `http://localhost:3000`, with the security headers. Any path that is not a built file, such as `/s/<id>` or `/r/<id>`, returns the app's index page.
+Builds the client (`npm run build`), then starts the server in production mode (`--production`). The server serves the built app and the Socket.IO relay from one origin at `http://localhost:3000`, with the security headers. Any path that is not a built file, such as `/s/<id>` or `/r/<id>`, returns the app's index page.
 
 ### Ports and settings
 
@@ -52,7 +52,7 @@ Builds the client (`npm run build`), then starts the server with `NODE_ENV=produ
 | `PORT` | `3000` | Server port. The dev proxy follows it. |
 | `HOST` | `127.0.0.1` | Address the server binds. The Docker image sets `0.0.0.0` inside the container; compose still publishes only on `127.0.0.1`. |
 | `ALLOWED_ORIGINS` | Development: `http://localhost:4200,http://127.0.0.1:4200`. Production: unset, which means same origin only. | Comma-separated origins allowed to open the WebSocket. Never `*`. |
-| `NODE_ENV` | unset | `production` (set by `npm start` and the Docker image) serves the built client from `client/dist/client/browser`. |
+| `NODE_ENV` | unset | `production` (set by the Docker image) serves the built client from `client/dist/client/browser`, as `npm start` does with its `--production` argument. |
 | `CLIENT_PORT` | `4200` | Docker only: the host port compose publishes. |
 
 The app does not terminate TLS and does not send `Strict-Transport-Security`. Put it behind a reverse proxy that terminates HTTPS and sets HSTS when it runs anywhere but `localhost`.

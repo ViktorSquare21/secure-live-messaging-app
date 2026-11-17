@@ -23,10 +23,10 @@ docker compose run --rm dev npm run typecheck
 docker compose run --rm dev sh -c "CI=1 npm run e2e"
 ```
 Result:
-- **`npm test`:** shared 262, server 143 and client 134, all passing. The new server tests:
+- **`npm test`:** shared 262, server 146 and client 134, all passing. The new server tests:
   - `server/src/static-site.test.ts` (16): exact header values; `script-src 'self'` with no `unsafe-inline` or `unsafe-eval`; `connect-src` and `frame-ancestors`; routing, including the fallback, traversal-style paths and refused methods; per-response headers; content types.
   - `server/src/static-server.test.ts` (12): the real server on a random port against a fixture build. The index page, a script asset and the `/r/` and `/s/` fallbacks return the exact headers; HEAD has no body; POST gets 405 with the headers; a traversal path gets the index page; a WebSocket from the page origin connects on the same server; long-polling is still refused; a missing build or index page fails to load.
-  - `server/src/config.test.ts`: `HOST` is read, trimmed, and defaults to `127.0.0.1`.
+  - `server/src/config.test.ts`: `HOST` is read, trimmed, and defaults to `127.0.0.1`; production mode is on with `--production` or `NODE_ENV=production`, and off otherwise.
   - `client/src/index-html.spec.ts`: the production index has no `<base>` element and only absolute asset paths; the dev index differs from it only by the `<base>` line.
 - **`npm run typecheck`:** passes in all workspaces.
 - **`npm run e2e`:** 5 passed (7.6 s). It builds the client, then runs the four existing tests against the dev stack on :4200 and the new `e2e/production-csp.spec.ts` against the production server on :4300:
@@ -89,12 +89,13 @@ Result:
 4. A long-polling handshake: `curl -s "http://localhost:4321/socket.io/?EIO=4&transport=polling"`
    **Observed:** `{"code":0,"message":"Transport unknown"}` with status 400.
 
-5. Starting production mode without a build (`NODE_ENV=production npx tsx src/main.ts` in `server/` with no `client/dist`):
+5. Starting production mode without a build (`npx tsx src/main.ts --production` in `server/` with no `client/dist`):
    **Observed:** the log line `server_start_failed missing_client_build` and exit code 1. Covered by the `loadStaticSite` tests.
 
 6. The CSP check itself can fail. With an inline `<script>` planted in the built `index.html`, the production e2e test failed with `["script-src-elem inline"]`; with `'unsafe-inline'` removed from `style-src`, it failed on the exact-policy assertion. Both were reverted.
 
 ## Not covered
 - Browsers other than Chromium. Older browsers may not treat `connect-src 'self'` as covering a same-origin WebSocket.
+- Windows and macOS hosts: the npm scripts use no shell syntax, but the runs above were on Linux only (the dev container).
 - HTTPS and HSTS: the app does not terminate TLS; that is left to a reverse proxy.
 - Security headers in development mode: the Angular dev server is not hardened.

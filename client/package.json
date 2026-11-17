@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --host ${CLIENT_HOST:-localhost} --port 4200",
+    "start": "node serve.mjs",
     "build": "ng build",
     "test": "ng test --watch=false",
     "typecheck": "ngc -p tsconfig.app.json --noEmit && ngc -p tsconfig.spec.json --noEmit"

@@ -8,11 +8,13 @@ export type OriginPolicyResult =
 
 export const DEV_ORIGINS: readonly string[] = ['http://localhost:4200', 'http://127.0.0.1:4200'];
 
-export function resolveOriginPolicy(env: Readonly<Record<string, string | undefined>>): OriginPolicyResult {
+export function resolveOriginPolicy(
+  env: Readonly<Record<string, string | undefined>>,
+  production: boolean,
+): OriginPolicyResult {
   const raw = env['ALLOWED_ORIGINS'];
   if (raw === undefined || raw === '') {
-    const policy: OriginPolicy =
-      env['NODE_ENV'] === 'production' ? { kind: 'same-origin' } : { kind: 'list', origins: DEV_ORIGINS };
+    const policy: OriginPolicy = production ? { kind: 'same-origin' } : { kind: 'list', origins: DEV_ORIGINS };
     return { ok: true, policy };
   }
   const origins = raw.split(',').map((origin) => origin.trim());

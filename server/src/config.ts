@@ -9,6 +9,13 @@ export function resolveServerHost(env: Readonly<Record<string, string | undefine
   return host === undefined || host === '' ? DEFAULT_SERVER_HOST : host;
 }
 
+export function isProductionMode(
+  args: readonly string[],
+  env: Readonly<Record<string, string | undefined>>,
+): boolean {
+  return args.includes('--production') || env['NODE_ENV'] === 'production';
+}
+
 export type PortResult =
   | { readonly ok: true; readonly port: number }
   | { readonly ok: false; readonly error: 'invalid_port' };

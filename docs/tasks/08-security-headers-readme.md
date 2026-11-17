@@ -120,6 +120,7 @@ The README at the repo root has these sections, in this order:
 - The Docker `app` service is published on `CLIENT_PORT` (default 4200), not the planned `APP_PORT` 8080: port 8080 was already taken on the development host, and one port setting for both services is simpler. `app` and `dev` use the same host port, so only one runs at a time.
 - The task expected no client code change, but the CSP's `base-uri 'none'` blocks Angular's default `<base href="/">`. The production index drops it and the build uses absolute asset paths; see "Verified or corrected".
 - `npm run e2e` now builds the client first, and the production webServer only starts the server. Building inside the webServer, next to `ng serve`, ran the dev container out of memory.
+- The npm scripts were made shell-independent so the README commands work on Windows too: the server's `start` passes `--production` instead of a POSIX `NODE_ENV=` prefix (`isProductionMode` accepts either, and `main.ts` passes the result to the origin policy as a value), the client's `start` runs `client/serve.mjs`, which reads `CLIENT_HOST` and starts `ng serve` without a shell, and `.gitattributes` keeps text files LF on every checkout. The client launcher and line endings date from task 00 but block this task's fresh-clone criterion on Windows. Only Linux was run.
 - The header integration test runs against a small fixture build, so `npm test` needs no client build. The real build is covered by the production e2e test and the manual curl check.
 
 **Decisions**
@@ -134,11 +135,12 @@ The README at the repo root has these sections, in this order:
 - The production server first inherited `ALLOWED_ORIGINS` for port 4200 from the dev container, so the sender could not create a session on :4300. Fixed by setting it blank for that webServer.
 - Building the client inside the Playwright webServer was killed with exit code 137 (out of memory) next to `ng serve`. The build moved into the `e2e` script.
 - Planted faults proved the e2e check can fail: an inline `<script>` in the built index gave `["script-src-elem inline"]`, and removing `'unsafe-inline'` from `style-src` failed the exact-policy assertion. Both were reverted.
+- Replacing `NODE_ENV=production` with `--production` first broke the production e2e test: the static build was served, but the origin policy still read `NODE_ENV` and kept the dev allow-list, so the page's own WebSocket was refused. `resolveOriginPolicy` now takes the production mode as an argument instead of reading it from the environment.
 - The README commands were run on a fresh clone: `docker compose up --build` served the headers, and in the dev container `npm ci`, `npm test`, `npm run typecheck` and `npm start` worked as written.
 
 **Test results**
-- `npm test`: shared 262, server 143 and client 134, all passing.
+- `npm test`: shared 262, server 146 and client 134, all passing.
 - `npm run typecheck`: passes in all workspaces.
-- `CI=1 npm run e2e`: 5 passed (4 dev, 1 production).
+- `CI=1 npm run e2e`: 5 passed (4 dev, 1 production). After the cross-platform script change: 5 passed twice with `--workers=1`; with the default workers, tests timed out setting up browser contexts at a host load average above 8, with the old scripts as well.
 - Docker `app` from a fresh clone, checked with curl: the exact headers on `/r/<id>` and on a script asset, 405 on POST, index fallback for unknown and traversal paths, polling refused with 400.
 - Headless Chromium against the production server: 4 screenshots in `docs/guides/screenshots/08/`, no CSP violations. See `docs/guides/08-test-guide.md`.

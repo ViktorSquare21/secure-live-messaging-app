@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { resolveServerHost, resolveServerPort } from './config';
+import { isProductionMode, resolveServerHost, resolveServerPort } from './config';
 import { startServer } from './create-server';
 import { resolveOriginPolicy } from './origin-policy';
 import { loadStaticSite } from './static-files';
@@ -7,20 +7,22 @@ import type { StaticSite } from './static-site';
 
 const CLIENT_BUILD_DIR = fileURLToPath(new URL('../../client/dist/client/browser', import.meta.url));
 
+const production = isProductionMode(process.argv.slice(2), process.env);
+
 const portResult = resolveServerPort(process.env);
 if (!portResult.ok) {
   console.error('server_start_failed invalid_port');
   process.exit(1);
 }
 
-const originResult = resolveOriginPolicy(process.env);
+const originResult = resolveOriginPolicy(process.env, production);
 if (!originResult.ok) {
   console.error('server_start_failed invalid_origins');
   process.exit(1);
 }
 
 let staticSite: StaticSite | undefined;
-if (process.env['NODE_ENV'] === 'production') {
+if (production) {
   try {
     staticSite = await loadStaticSite(CLIENT_BUILD_DIR);
   } catch {
