@@ -22,59 +22,59 @@ What the new server tests prove:
 - `server/src/token-hash.test.ts` (3 tests): the SHA-256 digest, a match for the right token only, and no throw on a hash of the wrong length.
 
 ## Manual steps
-1. Save this as `.scenario.sh` in the repo root. It drives the core through a whole session and prints the effects of each command:
-   ```sh
-   cd server && npx tsx -e "
-   import { runCommand, emptySessionState, DEFAULT_SESSION_CONFIG as cfg } from './src/session-core.ts';
-   import { checkRateLimit, DEFAULT_RATE_LIMITS } from './src/rate-limiter.ts';
-   import { encodeBase64Url } from '@slm/shared';
-   const b = (n: number, f: number) => encodeBase64Url(new Uint8Array(n).fill(f));
-   const id = b(16, 1), token = b(32, 2), env = (seq: number) => ({ v: 1, seq, iv: b(12, seq), ct: b(16, seq) });
-   let s = emptySessionState();
-   const step = (label: string, cmd: any, now = 0) => { const r = runCommand(s, cmd, now, cfg); s = r.state; console.log(label.padEnd(26), JSON.stringify(r.effects.map((e: any) => e.type === 'ack' ? (e.result.ok ? 'ack ok' : 'ack ' + e.result.error) : e.type + '->' + e.socketId + (e.peer ? ':' + e.peer : '')))); };
-   step('create', { type: 'create', sessionId: id, senderToken: token });
-   step('sender join, wrong token', { type: 'joinSender', sessionId: id, senderToken: b(32, 9), socketId: 's1' });
-   step('sender join', { type: 'joinSender', sessionId: id, senderToken: token, socketId: 's1' });
-   step('receiver join', { type: 'joinReceiver', sessionId: id, socketId: 'r1', freshRejoinToken: b(32, 3) });
-   step('second receiver', { type: 'joinReceiver', sessionId: id, socketId: 'r2', freshRejoinToken: b(32, 4) });
-   step('publish seq 1', { type: 'publish', socketId: 's1', envelope: env(1) });
-   step('publish seq 1 again', { type: 'publish', socketId: 's1', envelope: env(1) });
-   step('publish from receiver', { type: 'publish', socketId: 'r1', envelope: env(2) });
-   step('publish bad payload', { type: 'publish', socketId: 's1', envelope: { v: 1 } });
-   step('sender takeover', { type: 'joinSender', sessionId: id, senderToken: token, socketId: 's2' });
-   step('publish from old sender', { type: 'publish', socketId: 's1', envelope: env(2) });
-   step('receiver leave', { type: 'leave', socketId: 'r1' });
-   step('sender leave', { type: 'leave', socketId: 's2' }, 1000);
-   step('expire at TTL', { type: 'expire' }, 1000 + cfg.idleTtlMs); console.log('sessions:', s.sessions.size);
-   step('expire past TTL', { type: 'expire' }, 1001 + cfg.idleTtlMs); console.log('sessions:', s.sessions.size);
-   let rl: any; console.log('publish limiter, 11 in 1s:', Array.from({ length: 11 }, (_, i) => { const d = checkRateLimit(rl, i * 50, DEFAULT_RATE_LIMITS.messagePublish); rl = d.state; return d.allowed ? 'y' : 'n'; }).join(''));
-   "
-   ```
-2. Run it in the dev container, then delete the file:
-   ```sh
-   docker compose run --rm -T dev sh /app/.scenario.sh < /dev/null; rm .scenario.sh
-   ```
-   **Expected (actual output):**
-   ```
-   create                     ["ack ok"]
-   sender join, wrong token   ["ack bad_token"]
-   sender join                ["ack ok","peerStatus->s1:disconnected"]
-   receiver join              ["ack ok","peerStatus->r1:connected","peerStatus->s1:connected"]
-   second receiver            ["ack slot_taken"]
-   publish seq 1              ["ack ok","messageUpdate->r1"]
-   publish seq 1 again        ["ack stale_seq"]
-   publish from receiver      ["ack not_sender"]
-   publish bad payload        ["ack invalid_payload"]
-   sender takeover            ["ack ok","disconnect->s1","peerStatus->s2:connected","peerStatus->r1:connected"]
-   publish from old sender    ["ack not_sender"]
-   receiver leave             ["peerStatus->s2:disconnected"]
-   sender leave               []
-   expire at TTL              []
-   sessions: 1
-   expire past TTL            []
-   sessions: 0
-   publish limiter, 11 in 1s: yyyyyyyyyyn
-   ```
+Run this whole block from the repo root in one paste. It drives the core through a whole session in the dev container and prints the effects of each command. No file is created.
+
+```sh
+docker compose run --rm -T dev sh <<'SCENARIO'
+cd server && npx tsx -e "
+import { runCommand, emptySessionState, DEFAULT_SESSION_CONFIG as cfg } from './src/session-core.ts';
+import { checkRateLimit, DEFAULT_RATE_LIMITS } from './src/rate-limiter.ts';
+import { encodeBase64Url } from '@slm/shared';
+const b = (n: number, f: number) => encodeBase64Url(new Uint8Array(n).fill(f));
+const id = b(16, 1), token = b(32, 2), env = (seq: number) => ({ v: 1, seq, iv: b(12, seq), ct: b(16, seq) });
+let s = emptySessionState();
+const step = (label: string, cmd: any, now = 0) => { const r = runCommand(s, cmd, now, cfg); s = r.state; console.log(label.padEnd(26), JSON.stringify(r.effects.map((e: any) => e.type === 'ack' ? (e.result.ok ? 'ack ok' : 'ack ' + e.result.error) : e.type + '->' + e.socketId + (e.peer ? ':' + e.peer : '')))); };
+step('create', { type: 'create', sessionId: id, senderToken: token });
+step('sender join, wrong token', { type: 'joinSender', sessionId: id, senderToken: b(32, 9), socketId: 's1' });
+step('sender join', { type: 'joinSender', sessionId: id, senderToken: token, socketId: 's1' });
+step('receiver join', { type: 'joinReceiver', sessionId: id, socketId: 'r1', freshRejoinToken: b(32, 3) });
+step('second receiver', { type: 'joinReceiver', sessionId: id, socketId: 'r2', freshRejoinToken: b(32, 4) });
+step('publish seq 1', { type: 'publish', socketId: 's1', envelope: env(1) });
+step('publish seq 1 again', { type: 'publish', socketId: 's1', envelope: env(1) });
+step('publish from receiver', { type: 'publish', socketId: 'r1', envelope: env(2) });
+step('publish bad payload', { type: 'publish', socketId: 's1', envelope: { v: 1 } });
+step('sender takeover', { type: 'joinSender', sessionId: id, senderToken: token, socketId: 's2' });
+step('publish from old sender', { type: 'publish', socketId: 's1', envelope: env(2) });
+step('receiver leave', { type: 'leave', socketId: 'r1' });
+step('sender leave', { type: 'leave', socketId: 's2' }, 1000);
+step('expire at TTL', { type: 'expire' }, 1000 + cfg.idleTtlMs); console.log('sessions:', s.sessions.size);
+step('expire past TTL', { type: 'expire' }, 1001 + cfg.idleTtlMs); console.log('sessions:', s.sessions.size);
+let rl: any; console.log('publish limiter, 11 in 1s:', Array.from({ length: 11 }, (_, i) => { const d = checkRateLimit(rl, i * 50, DEFAULT_RATE_LIMITS.messagePublish); rl = d.state; return d.allowed ? 'y' : 'n'; }).join(''));
+"
+SCENARIO
+```
+
+**Expected (actual output):**
+```
+create                     ["ack ok"]
+sender join, wrong token   ["ack bad_token"]
+sender join                ["ack ok","peerStatus->s1:disconnected"]
+receiver join              ["ack ok","peerStatus->r1:connected","peerStatus->s1:connected"]
+second receiver            ["ack slot_taken"]
+publish seq 1              ["ack ok","messageUpdate->r1"]
+publish seq 1 again        ["ack stale_seq"]
+publish from receiver      ["ack not_sender"]
+publish bad payload        ["ack invalid_payload"]
+sender takeover            ["ack ok","disconnect->s1","peerStatus->s2:connected","peerStatus->r1:connected"]
+publish from old sender    ["ack not_sender"]
+receiver leave             ["peerStatus->s2:disconnected"]
+sender leave               []
+expire at TTL              []
+sessions: 1
+expire past TTL            []
+sessions: 0
+publish limiter, 11 in 1s: yyyyyyyyyyn
+```
 
 ## Failure cases
 All of them appear in the output above, each answered with a fixed code and no state change:

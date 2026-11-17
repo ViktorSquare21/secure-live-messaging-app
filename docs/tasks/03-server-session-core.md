@@ -137,6 +137,7 @@ Doesn't exist.
 
 **Verified or corrected:**
 - The first test run failed 7 purity tests: `structuredClone` turns a Node `Buffer` into a plain `Uint8Array`, so the cloned input no longer equalled the original. Fixed by returning a plain `Uint8Array` from `hashToken`.
+- On review, the test guide's manual steps failed with `cannot open /app/.scenario.sh`: they asked for the script to be saved by hand before running it. They are now one paste-and-run block that pipes the script into the container, and that block, extracted from the guide, gives output identical to the guide's.
 - Checked that the tests catch real faults by planting four of them one at a time: accepting an equal seq (2 tests failed), skipping the sender token check (1), skipping the rejoin token check (1), and letting any bound socket publish (2). The source was restored and compared byte for byte with a saved copy.
 
 **Test results:**
