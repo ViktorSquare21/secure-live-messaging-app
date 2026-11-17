@@ -8,7 +8,7 @@ Written by the `secure-live-messaging-task-intake` skill from `docs/implementati
 | [01](01-crypto-envelope.md) | Shared AES-GCM-256 envelope with key-in-fragment encoding and non-throwing decrypt | Feature | Shared, Tests | 30 min | 00 | Done |
 | [02](02-protocol-types-validators.md) | Shared protocol contract with strict validators for envelopes and join payloads | Feature | Shared, Tests | 10 min | 00, 01 | Done |
 | [03](03-server-session-core.md) | Pure server session core enforces role slots, sender token and increasing seq | Feature | Server, Tests | 40 min | 02 | Done |
-| [04](04-socket-server-integration.md) | Socket.IO relay server wires the session core to live sender and receiver sockets | Feature | Server, Tests | 45 min | 01, 03 | Todo |
+| [04](04-socket-server-integration.md) | Socket.IO relay server wires the session core to live sender and receiver sockets | Feature | Server, Tests | 45 min | 01, 03 | Done |
 | [05](05-client-session-services.md) | Client session services: debounced encrypted publishing and pure receiver state | Feature | Client, Tests | 30 min | 01, 02 | Todo |
 | [06](06-sender-receiver-ui.md) | Home, sender and receiver pages with Material, plain-text rendering and clear error states | Feature | Client, Tests | 40 min | 05 | Todo |
 | [07](07-end-to-end-tests.md) | Two-browser end-to-end tests for live updates and a corrupted key link | Feature | Tests | 20 min | 04, 06 | Todo |

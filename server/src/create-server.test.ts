@@ -4,6 +4,8 @@ import * as shared from '@slm/shared';
 import { startServer, type RunningServer } from './create-server';
 
 const HOST = '127.0.0.1';
+const ORIGIN = 'http://localhost:4200';
+const OPTIONS = { port: 0, host: HOST, originPolicy: { kind: 'list', origins: [ORIGIN] }, log: () => undefined } as const;
 const EVENT_TIMEOUT_MS = 2000;
 
 let server: RunningServer | undefined;
@@ -33,10 +35,11 @@ describe('startServer', () => {
   });
 
   test('accepts a Socket.IO connection over WebSocket', async () => {
-    server = await startServer(0, HOST);
+    server = await startServer(OPTIONS);
     const client = connectClient(`http://${HOST}:${server.port}`, {
       transports: ['websocket'],
       reconnection: false,
+      extraHeaders: { origin: ORIGIN },
     });
     clients.push(client);
 
@@ -47,9 +50,9 @@ describe('startServer', () => {
   });
 
   test('refuses an HTTP long-polling handshake', async () => {
-    server = await startServer(0, HOST);
+    server = await startServer(OPTIONS);
 
-    const response = await fetch(`http://${HOST}:${server.port}/socket.io/?EIO=4&transport=polling`);
+    const response = await fetch(`http://${HOST}:${server.port}/socket.io/?EIO=4&transport=polling`, { headers: { origin: ORIGIN } });
     const body: unknown = await response.json();
 
     expect(response.status).toBe(400);
@@ -57,10 +60,11 @@ describe('startServer', () => {
   });
 
   test('refuses a client that only offers long-polling', async () => {
-    server = await startServer(0, HOST);
+    server = await startServer(OPTIONS);
     const client = connectClient(`http://${HOST}:${server.port}`, {
       transports: ['polling'],
       reconnection: false,
+      extraHeaders: { origin: ORIGIN },
     });
     clients.push(client);
 
@@ -71,7 +75,7 @@ describe('startServer', () => {
   });
 
   test('does not serve the Socket.IO client bundle', async () => {
-    server = await startServer(0, HOST);
+    server = await startServer(OPTIONS);
 
     const response = await fetch(`http://${HOST}:${server.port}/socket.io/socket.io.js`);
     await response.arrayBuffer();

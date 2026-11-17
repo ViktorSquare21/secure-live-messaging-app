@@ -44,28 +44,28 @@ Doesn't exist. The pure session core (task 03) decides outcomes but nothing is l
 - **Token and id entropy:** both come from a cryptographically secure source, never from a general-purpose random function.
 
 ## Tests
-- [ ] Integration (real server on port 0, socket.io-client, WebSocket transport): sender creates a session, joins as sender, receiver joins, sender publishes **two consecutive updates** (seq 1 then seq 2), and the receiver gets both message updates in that order with envelopes identical to what was sent.
-- [ ] Integration: the sender publishes before any receiver joins; a receiver joining afterwards gets the latest envelope in its join ack, and nothing older.
-- [ ] Integration: a publish sent from the receiver socket is acked with `not_sender`, and the sender does not get anything relayed back.
-- [ ] Integration: a sender joining with a wrong token gets `bad_token`; a second receiver gets `slot_taken`; joining an unknown session id gets `unknown_session`.
-- [ ] Integration: the sender encrypts a real update with the task 01 crypto envelope, flips one ciphertext byte, and publishes it; the receiver gets the envelope byte-for-byte as tampered (the server is blind), and decrypting it with the shared decrypt returns an integrity error.
-- [ ] Integration: a publish with a stale or duplicate seq gets `stale_seq` and is not relayed; a malformed envelope gets `invalid_payload` and the server keeps serving other sockets.
-- [ ] Integration: the sender disconnects, the receiver gets a disconnected peer status; the sender reconnects on a new socket with the same token, rejoins, the receiver gets a connected peer status, and the next published update reaches the receiver.
-- [ ] Integration: with a low configured limit, a socket that sends more session creates than allowed gets `rate_limited` for the extra ones, and a sender that publishes faster than allowed gets `rate_limited` and nothing is relayed for those; a different socket is not affected.
-- [ ] Integration: with a session cap of one, a second session create gets `server_busy`.
-- [ ] Integration: a client forcing long-polling transport cannot connect, and a client presenting an origin outside the allow-list cannot connect.
-- [ ] Integration: a receiver whose old socket is still connected rejoins on a new socket with its rejoin token and receives the next update; the old socket is disconnected. A third socket joining with only the session id gets `slot_taken`.
-- [ ] Integration: with a short sweep interval and an injected short TTL, an idle session expires and a later receiver join gets `unknown_session`.
+- [x] Integration (real server on port 0, socket.io-client, WebSocket transport): sender creates a session, joins as sender, receiver joins, sender publishes **two consecutive updates** (seq 1 then seq 2), and the receiver gets both message updates in that order with envelopes identical to what was sent.
+- [x] Integration: the sender publishes before any receiver joins; a receiver joining afterwards gets the latest envelope in its join ack, and nothing older.
+- [x] Integration: a publish sent from the receiver socket is acked with `not_sender`, and the sender does not get anything relayed back.
+- [x] Integration: a sender joining with a wrong token gets `bad_token`; a second receiver gets `slot_taken`; joining an unknown session id gets `unknown_session`.
+- [x] Integration: the sender encrypts a real update with the task 01 crypto envelope, flips one ciphertext byte, and publishes it; the receiver gets the envelope byte-for-byte as tampered (the server is blind), and decrypting it with the shared decrypt returns an integrity error.
+- [x] Integration: a publish with a stale or duplicate seq gets `stale_seq` and is not relayed; a malformed envelope gets `invalid_payload` and the server keeps serving other sockets.
+- [x] Integration: the sender disconnects, the receiver gets a disconnected peer status; the sender reconnects on a new socket with the same token, rejoins, the receiver gets a connected peer status, and the next published update reaches the receiver.
+- [x] Integration: with a low configured limit, a socket that sends more session creates than allowed gets `rate_limited` for the extra ones, and a sender that publishes faster than allowed gets `rate_limited` and nothing is relayed for those; a different socket is not affected.
+- [x] Integration: with a session cap of one, a second session create gets `server_busy`.
+- [x] Integration: a client forcing long-polling transport cannot connect, and a client presenting an origin outside the allow-list cannot connect.
+- [x] Integration: a receiver whose old socket is still connected rejoins on a new socket with its rejoin token and receives the next update; the old socket is disconnected. A third socket joining with only the session id gets `slot_taken`.
+- [x] Integration: with a short sweep interval and an injected short TTL, an idle session expires and a later receiver join gets `unknown_session`.
 
 ## Acceptance criteria
-- [ ] Two consecutive updates published by a sender arrive at the receiver in seq order, unchanged byte-for-byte, over a WebSocket-only connection.
-- [ ] A receiver joining late sees the latest envelope immediately in its join ack.
-- [ ] A publish from any socket other than the one that joined with the correct sender token is refused with `not_sender`, and nothing is relayed.
-- [ ] A tampered envelope is relayed unchanged, and the shared decrypt on the receiver side reports an integrity error.
-- [ ] A sender that reconnects with its token can publish again, and the receiver's peer status goes disconnected then connected.
-- [ ] A socket that exceeds the create or publish limit gets `rate_limited`, and creates beyond the session cap get `server_busy`.
-- [ ] Idle sessions are removed by the periodic sweep, and the sweep timer stops when the server stops.
-- [ ] No log line contains an IV, ciphertext, sender token or key.
+- [x] Two consecutive updates published by a sender arrive at the receiver in seq order, unchanged byte-for-byte, over a WebSocket-only connection.
+- [x] A receiver joining late sees the latest envelope immediately in its join ack.
+- [x] A publish from any socket other than the one that joined with the correct sender token is refused with `not_sender`, and nothing is relayed.
+- [x] A tampered envelope is relayed unchanged, and the shared decrypt on the receiver side reports an integrity error.
+- [x] A sender that reconnects with its token can publish again, and the receiver's peer status goes disconnected then connected.
+- [x] A socket that exceeds the create or publish limit gets `rate_limited`, and creates beyond the session cap get `server_busy`.
+- [x] Idle sessions are removed by the periodic sweep, and the sweep timer stops when the server stops.
+- [x] No log line contains an IV, ciphertext, sender token or key.
 
 ## Out of scope
 - Workspace setup, dev proxy for the socket path and root scripts (task 00).
@@ -92,3 +92,36 @@ Doesn't exist. The pure session core (task 03) decides outcomes but nothing is l
 - **Summary:** explain *why*, not just *what*.
 - **Changed files:** the key files touched, one line each on why.
 - **Test results:** `npm test` output, plus `npm run e2e` for client or flow changes.
+
+## Implementation notes
+
+**Built:**
+- `server/src/relay.ts`: the Socket.IO shell. Each event goes through a pure intake check, then the session core's `decide`; the shell applies the changes to its own maps and executes the effects (acks, `message:update` and `peer:status` to one socket, disconnects). A disconnect runs `leave`, and an `.unref()`'d sweep runs `expire` and is cleared on stop.
+- `server/src/event-intake.ts` (pure): ack present, then per-socket rate limit (create and publish), then argument count, then the shared validators. An event without an ack is ignored.
+- `server/src/origin-policy.ts` (pure) and `socket-options.ts`: an explicit origin allow-list enforced in `allowRequest` (the `cors` option does not guard WebSocket upgrades), `maxHttpBufferSize` 80 KB, WebSocket only, no compression, no served client.
+- `server/src/log.ts` (pure): log entries carry only an event name, an outcome code and a count.
+- `server/src/session-store.ts`: applies the core's changes to the shell's maps in place, so a publish stays O(1).
+- `server/src/create-server.ts` and `main.ts`: inject the clock, logger, limits, session config and sweep interval; read `ALLOWED_ORIGINS` and `NODE_ENV` from the environment.
+
+**Deviations:**
+- No Socket.IO rooms. The core addresses every socket by id, and `io.to(socketId)` uses the socket's own room, so joining or leaving a named room adds nothing.
+- The shell validates before the core, so a receiver that sends a malformed envelope gets `invalid_payload` rather than `not_sender`. `stale_seq` still comes only after the core's role check, so seq is never revealed to a non-sender.
+- No retry on a session id collision: the core's `server_busy` ack goes out. With 128-bit random ids this is practically unreachable.
+
+**Decisions:**
+- A connection without an `Origin` header is refused. Browsers always send it; non-browser clients must set it.
+- `ALLOWED_ORIGINS` (comma-separated, each a bare `http`/`https` origin) sets the allow-list; an invalid entry stops the server with `server_start_failed invalid_origins`. Without it, `NODE_ENV=production` means same-origin (the Origin's host equals the request's `Host`), and anything else allows `http://localhost:4200` and `http://127.0.0.1:4200`.
+- Log format: one line per event, `event=<name> outcome=<code>`; connects and disconnects log the connected socket count, and the sweep logs the number of expired sessions.
+- Default sweep interval 60 s; TTL, session cap and rate limits use the task 03 defaults.
+
+**Verified or corrected:**
+- Two integration tests were racy: an earlier update could arrive after the collector was attached. Fixed with a round-trip barrier before collecting, not a sleep.
+- The no-Origin test first passed the allowed origin, because `undefined` triggered the helper's default parameter. Fixed by passing `null` explicitly.
+- The manual scenario showed disconnect counts one too high: `io.engine.clientsCount` drops only after the `disconnect` event. Switched to the namespace's socket count and added a test for the connect and disconnect counts.
+- Planted faults each made tests fail: sweep timer not cleared (1), a field added to the relayed envelope (6), origin check off (3), no `leave` on disconnect (2).
+
+**Test results:**
+- `npm test`: shared 262, server 113, client 4, all passing.
+- `npm run typecheck`: passes in all workspaces.
+- `npm audit --omit=dev`: 0 vulnerabilities.
+- No lint script exists. No browser check: there is no page until task 06.
