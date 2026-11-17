@@ -1,19 +1,28 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { MatToolbar } from '@angular/material/toolbar';
+import { RouterLink, RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatToolbar, RouterLink, RouterOutlet],
   template: `
-    <main class="placeholder">
-      <h1>Secure Live Messaging</h1>
-      <p>End-to-end encrypted live text sharing. Coming soon.</p>
+    <mat-toolbar>
+      <a class="brand" routerLink="/">Secure Live Messaging</a>
+    </mat-toolbar>
+    <main class="page">
+      <router-outlet />
     </main>
   `,
   styles: `
-    .placeholder {
-      max-width: 40rem;
+    .brand {
+      color: inherit;
+      text-decoration: none;
+    }
+    .page {
+      max-width: 48rem;
       margin: 0 auto;
-      padding: 3rem 1.5rem;
+      padding: 2rem 1.5rem;
     }
   `,
 })

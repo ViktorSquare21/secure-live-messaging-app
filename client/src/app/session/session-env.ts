@@ -38,3 +38,13 @@ export const APP_ORIGIN = new InjectionToken<string>('APP_ORIGIN', {
   providedIn: 'root',
   factory: () => inject(DOCUMENT).location.origin,
 });
+
+export type ClipboardWriter = (text: string) => Promise<void>;
+
+export const CLIPBOARD = new InjectionToken<ClipboardWriter | null>('CLIPBOARD', {
+  providedIn: 'root',
+  factory: () => {
+    const clipboard = inject(DOCUMENT).defaultView?.navigator.clipboard;
+    return clipboard === undefined ? null : (text) => clipboard.writeText(text);
+  },
+});
